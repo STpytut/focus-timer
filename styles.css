@@ -168,6 +168,7 @@ body[data-status="paused"] .time {
   width: 100%;
   display: flex;
   justify-content: flex-end;
+  gap: 0.25rem;
   margin-bottom: -1.25rem;
 }
 
@@ -260,6 +261,168 @@ kbd {
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Views: the timer and Stats replace each other inside .app */
+
+.view {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+/* Stats view */
+
+.stats {
+  gap: 1.5rem;
+  text-align: left;
+}
+
+.stats-header {
+  align-self: stretch;
+}
+
+.stats-title {
+  align-self: stretch;
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.stats-title:focus {
+  outline: none;
+}
+
+.stats-title:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.metrics {
+  width: 100%;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.75rem;
+}
+
+.metric {
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.metric dt {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.metric dd {
+  margin: 0.25rem 0 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-sub {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.chart-figure {
+  width: 100%;
+  margin: 0;
+  padding: 1rem 0.75rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.chart-title {
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.chart {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+.chart-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.chart-count {
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-track {
+  width: 100%;
+  max-width: 2.25rem;
+  height: 8rem;
+  display: flex;
+  align-items: flex-end;
+  border-bottom: 2px solid var(--border);
+}
+
+.chart-bar {
+  width: 100%;
+  border-radius: 0.4rem 0.4rem 0 0;
+  background: var(--muted);
+}
+
+.is-today .chart-bar {
+  background: var(--accent);
+}
+
+.chart-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.is-today .chart-label {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.stats-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.stats-actions {
+  align-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
 }
 
 /* Settings dialog */
@@ -430,6 +593,18 @@ kbd {
 
   .dialog-actions .button {
     flex: 1 1 auto;
+  }
+
+  .chart-figure {
+    padding: 0.75rem 0.4rem 0.5rem;
+  }
+
+  .chart {
+    gap: 0.15rem;
+  }
+
+  .chart-label {
+    font-size: 0.7rem;
   }
 }
 

@@ -10,10 +10,11 @@ system's light/dark preference and works on narrow phone screens.
 - All of these lengths can be changed in **Settings** (the gear button), along
   with optional auto-start, an end-of-phase chime and background
   notifications.
-- A row of dots shows the focus sessions you completed today. The count is
-  saved in `localStorage` and starts again at zero on a new local day. If
-  storage is unavailable, holds invalid data, or fails later (for example when
-  full), the count is kept in memory for the current page.
+- A row of dots shows the focus sessions you completed today. It starts
+  again at zero on a new local day.
+- **Stats** (the bar-chart button next to the gear) shows the last seven
+  days, focus time today and this week, your daily streak, and exports your
+  history as CSV. History is kept for 90 days in `localStorage`.
 
 ## Run it
 
@@ -38,6 +39,81 @@ Tests use an injected clock, so they are deterministic and run without real
 waiting. Storage, Web Audio and the Notification API are replaced with small
 fakes, so the suites run in Node without a browser.
 
+## Stats and history
+
+Open Stats with the bar-chart button next to the gear. The Stats view
+replaces the timer on the page; **Back to timer** (or `Escape`) returns to
+it. The timer keeps running and keeps all its state while Stats is shown, and
+a session that finishes meanwhile shows up in Stats immediately. Opening
+Stats moves keyboard focus to its heading; going back returns focus to the
+Stats button. The `Space` / `R` timer shortcuts are off while Stats is shown.
+
+What it shows (all by your device's local calendar day):
+
+- **Focus today** — minutes of focus completed today, with the number of
+  completed sessions.
+- **This week** — focus minutes from Monday through today.
+- **Daily streak** — consecutive days with at least one completed focus
+  session. It ends today if you have completed a session today, otherwise
+  yesterday (so the streak is not lost before you start today); it is 0 if
+  neither today nor yesterday has a session. Days without a session are never
+  bridged.
+- **Last 7 days** — one bar per day, ending with today; days without
+  sessions show as an empty bar with a 0. The number above each bar is the
+  count of completed focus sessions; every bar has a screen-reader label with
+  the full date, session count and focus minutes.
+
+What counts: only focus sessions that run to the end, each once, on the day
+the page notices it finished. A session counts the length it was started
+with — even if you changed the length in Settings while it was running or
+paused. Skipped or reset focus time, breaks, paused time and time a
+background tab ran past the end are not counted.
+
+### Storage and retention
+
+History is saved in `localStorage` under `focus-timer:history` as one record
+per local date (`YYYY-MM-DD`) with completed sessions and focus minutes.
+Today plus the previous 89 days are kept. Older days are removed — from
+storage as well as from what is shown and exported — when the page loads and
+whenever the history is read after a day has aged out (the dots and Stats
+refresh every minute, so this also happens if the page stays open past
+midnight). Storage is only rewritten when something was actually removed. If storage is unavailable, holds invalid data, or a read or write
+fails (for example when full), the history is kept in memory for the current
+page and the stored copy is left alone. Invalid individual days in an
+otherwise valid history are ignored. Open tabs pick up sessions recorded in
+other tabs.
+
+### Carrying over the old daily count
+
+Earlier versions stored only today's session count (`focus-timer:daily`).
+The first time this version loads, a valid count dated today becomes
+today's history entry; a count from an earlier day is ignored. **Limitation:** the old
+count has no durations, so those sessions are recorded with 0 focus minutes —
+they count towards sessions and the streak but not towards focus minutes.
+The carry-over happens once: the old key is removed only after the history
+has been saved, and once any history exists it always takes precedence, so a
+reload (or an old version still open in another tab) can never add the old
+count again.
+
+### CSV export
+
+**Export CSV** downloads `focus-timer-history-YYYY-MM-DD.csv` with every
+retained day, oldest first:
+
+```csv
+date,completed_sessions,focus_minutes
+2026-09-30,4,100
+2026-10-01,2,50
+```
+
+- `date` — local calendar date, `YYYY-MM-DD`.
+- `completed_sessions` — completed focus sessions that day.
+- `focus_minutes` — total focus minutes that day (0 for sessions carried
+  over from the old daily count).
+
+Only days with recorded sessions have rows. With no history yet, the file
+contains just the header row and the page says so.
+
 ## Settings
 
 Open Settings with the gear button in the top-right corner.
@@ -55,7 +131,7 @@ Open Settings with the gear button in the top-right corner.
   changes. Invalid values are explained next to the field and nothing is
   applied or stored until every field is valid.
 - Settings are saved in `localStorage` under `focus-timer:settings`, separate
-  from the daily count (`focus-timer:daily`), so neither can damage the other.
+  from the history (`focus-timer:history`), so neither can damage the other.
   An unreadable or malformed stored value falls back to the defaults (invalid
   individual fields fall back on their own). If storage is unavailable or a
   save fails, the new settings still apply for the current page.
@@ -66,8 +142,8 @@ Open Settings with the gear button in the top-right corner.
   length and remaining time it started with. New lengths apply to the
   following phases, and to the current phase when you press **Reset**.
 - A phase that has not been started yet switches to the new length at once.
-- Completed sessions, progress in the current cycle and today's count are
-  kept. A new "sessions before a long break" value is checked the next time a
+- Completed sessions, progress in the current cycle, today's count and the
+  history are kept. A new "sessions before a long break" value is checked the next time a
   focus session completes: if you lower it below the progress you have
   already made, the next completed focus session leads to the long break.
 
@@ -112,7 +188,7 @@ to about a minute in some browsers); the countdown itself stays accurate.
 | `Space` | Start / pause / resume       |
 | `R`     | Reset the current phase      |
 
-Shortcuts are ignored for held-down (repeated) keys, with Ctrl/Cmd/Alt, and
+Shortcuts are ignored while the Stats view is shown, for held-down (repeated) keys, with Ctrl/Cmd/Alt, and
 while typing in a text field. When a button has keyboard focus, `Space`
 activates that button as usual rather than also triggering the shortcut.
 
@@ -138,7 +214,7 @@ shortcuts are off while it is open.
 
 Under the phase name, "Session N of 4" shows progress in the current cycle
 (the 4 follows your setting).
-This is separate from the daily count, which includes every completed focus
+This is separate from today's count, which includes every completed focus
 session today across cycles.
 
 The countdown is computed from a deadline rather than by counting interval
@@ -152,12 +228,19 @@ the action has no further effect.
 - `src/timer.js` — timer state machine with live `configure()`; no DOM or
   storage access.
 - `src/settings.js` — settings defaults, validation and safe persistence.
-- `src/daily.js` — daily completed-session count with safe storage.
+- `src/history.js` — per-day focus history: recording, 90-day retention,
+  legacy carry-over, local calendar arithmetic, week/streak/7-day metrics
+  and CSV; safe storage with in-memory fallback.
+- `src/daily.js` — local date keys, safe storage detection and the legacy
+  daily count format (still exported, no longer used by the page).
 - `src/sound.js` — Web Audio chime.
 - `src/notify.js` — notification permission and display.
 - `src/keyboard.js` — keyboard shortcut mapping.
 - `src/app.js` — connects the above to the page, including the Settings
-  dialog.
-- `tests/` — `node:test` suites for the timer, settings, daily count, sound,
-  notifications and keyboard modules (`app.js` is browser-only and not
-  covered by them).
+  dialog and the Stats view.
+- `tests/` — `node:test` suites, one per module: `timer.test.js` (including
+  the completed-duration contract used by the history), `history.test.js`
+  (rollover, 90-day pruning, legacy carry-over, streak/week/7-day metrics,
+  CSV, reload and storage failures), `settings.test.js`, `daily.test.js`,
+  `sound.test.js`, `notify.test.js` and `keyboard.test.js`. `app.js` is
+  browser-only and not covered by them.

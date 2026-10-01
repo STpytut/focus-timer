@@ -1,6 +1,10 @@
 // Daily completed-session count, persisted per local calendar day.
 // Storage is optional: if it is missing, throws, or holds invalid data, the
 // count falls back to memory for the current page.
+//
+// Legacy: the app now records sessions in the focus history (history.js),
+// which carries over today's count from this key once. The date helpers and
+// parser here are shared with it.
 
 export const STORAGE_KEY = 'focus-timer:daily';
 
@@ -26,7 +30,8 @@ export function getSafeStorage() {
   }
 }
 
-function parse(raw) {
+/** Parses a stored `{date, count}` record; null if missing or invalid. */
+export function parseDailyRecord(raw) {
   if (typeof raw !== 'string') return null;
   try {
     const value = JSON.parse(raw);
@@ -57,7 +62,7 @@ export function createDailyCounter({ storage = null, today = () => localDateKey(
   function read() {
     if (storage) {
       try {
-        const stored = parse(storage.getItem(STORAGE_KEY));
+        const stored = parseDailyRecord(storage.getItem(STORAGE_KEY));
         if (stored) memory = stored;
       } catch {
         storage = null;

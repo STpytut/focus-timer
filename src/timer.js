@@ -19,6 +19,8 @@
 //   remaining time it was started with; an idle phase takes the new length.
 //   Later phases and reset() use the newest lengths. Cycle progress is kept;
 //   a new threshold is evaluated on the next completed work session.
+// - A 'complete' event carries durationMs: the length the finished phase
+//   was started with, captured before the timer moves to the next phase.
 // - pause() keeps the exact remaining time; resume() continues from it.
 // - reset() restarts the current phase from its full duration and stops it.
 //   Completed sessions and cycle progress are kept.
@@ -119,6 +121,7 @@ export function createTimer({
 
   function complete() {
     const finished = phase;
+    const finishedDuration = phaseDuration; // the length this phase actually ran
     let next;
     if (finished === PHASES.WORK) {
       completedWorkSessions += 1;
@@ -133,7 +136,13 @@ export function createTimer({
       status = STATUSES.RUNNING;
       deadline = now() + remaining;
     }
-    const event = { type: 'complete', phase: finished, nextPhase: next, autoStarted: autoStart };
+    const event = {
+      type: 'complete',
+      phase: finished,
+      nextPhase: next,
+      autoStarted: autoStart,
+      durationMs: finishedDuration,
+    };
     emit(event);
     return event;
   }

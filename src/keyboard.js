@@ -1,5 +1,6 @@
 // Maps keydown events to timer shortcuts: Space toggles, R resets.
-// Shortcuts are off while a modal dialog (Settings) is open.
+// Shortcuts are off while a modal dialog (Settings) is open and while the
+// Stats view replaces the timer.
 
 const EDITABLE = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
 // Elements that already activate on Space; handling Space globally there
@@ -14,11 +15,11 @@ function isEditable(target) {
 /**
  * @param {{key: string, code?: string, repeat?: boolean, ctrlKey?: boolean,
  *   metaKey?: boolean, altKey?: boolean, target?: any}} event
- * @param {{modalOpen?: boolean}} [context]
+ * @param {{modalOpen?: boolean, statsOpen?: boolean}} [context]
  * @returns {'toggle' | 'reset' | null}
  */
-export function shortcutFor(event, { modalOpen = false } = {}) {
-  if (modalOpen) return null;
+export function shortcutFor(event, { modalOpen = false, statsOpen = false } = {}) {
+  if (modalOpen || statsOpen) return null;
   if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return null;
   const target = event.target;
   if (isEditable(target)) return null;

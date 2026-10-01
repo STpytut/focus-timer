@@ -76,6 +76,7 @@ test('work completes into a stopped short break, then back to stopped work', () 
     phase: PHASES.WORK,
     nextPhase: PHASES.SHORT_BREAK,
     autoStarted: false,
+    durationMs: 25 * MIN,
   });
 
   let s = timer.getState();
@@ -537,7 +538,13 @@ test('cycleText stays truthful when the threshold changes', () => {
 test('auto-start runs the next phase from the moment completion is observed', () => {
   const { timer, clock, events } = setup({ autoStart: true });
   const done = finishPhase(timer, clock);
-  assert.deepEqual(done, { type: 'complete', phase: PHASES.WORK, nextPhase: PHASES.SHORT_BREAK, autoStarted: true });
+  assert.deepEqual(done, {
+    type: 'complete',
+    phase: PHASES.WORK,
+    nextPhase: PHASES.SHORT_BREAK,
+    autoStarted: true,
+    durationMs: 25 * MIN,
+  });
   let s = timer.getState();
   assert.equal(s.phase, PHASES.SHORT_BREAK);
   assert.equal(s.status, STATUSES.RUNNING);
@@ -618,4 +625,63 @@ test('turning auto-start off while running leaves the next phase stopped', () =>
   clock.advance(25 * MIN);
   assert.equal(timer.tick().autoStarted, false);
   assert.equal(timer.getState().status, STATUSES.IDLE);
+});
+
+// --- Completed duration (used by the focus history) ---
+
+test('complete events carry the duration each finished phase ran with', () => {
+  const { timer, clock } = setup({ durations: { work: 10 * MIN, shortBreak: 2 * MIN } });
+  assert.equal(finishPhase(timer, clock).durationMs, 10 * MIN);
+  assert.equal(finishPhase(timer, clock).durationMs, 2 * MIN);
+});
+
+test('complete reports the started length when settings change while running or paused', () => {
+  for (const pauseFirst of [false, true]) {
+    const { timer, clock, events } = setup();
+    timer.start();
+    clock.advance(5 * MIN);
+    if (pauseFirst) {
+      timer.pause();
+      clock.advance(60 * MIN); // paused time is not focus time
+      timer.configure({ durations: { work: 50 * MIN } });
+      timer.resume();
+    } else {
+      timer.configure({ durations: { work: 50 * MIN } });
+    }
+    clock.advance(20 * MIN);
+    const done = timer.tick();
+    assert.equal(done.phase, PHASES.WORK, String(pauseFirst));
+    assert.equal(done.durationMs, 25 * MIN, String(pauseFirst));
+    assert.equal(events.filter((e) => e.type === 'complete').length, 1);
+    // The next work phase uses the new length and reports it.
+    finishPhase(timer, clock);
+    assert.equal(finishPhase(timer, clock).durationMs, 50 * MIN);
+  }
+});
+
+test('complete reports the new length when an idle phase was reconfigured', () => {
+  const { timer, clock } = setup();
+  timer.configure({ durations: { work: 40 * MIN } });
+  assert.equal(finishPhase(timer, clock).durationMs, 40 * MIN);
+});
+
+test('complete duration ignores overdue time and is not affected by the auto-started phase', () => {
+  const { timer, clock } = setup({ autoStart: true, durations: { work: 10 * MIN, shortBreak: 3 * MIN } });
+  timer.start();
+  clock.advance(3 * 60 * MIN); // background tab, very late tick
+  const done = timer.tick();
+  assert.equal(done.durationMs, 10 * MIN);
+  assert.equal(done.nextPhase, PHASES.SHORT_BREAK);
+  assert.equal(timer.getState().durationMs, 3 * MIN);
+});
+
+test('skip and reset emit no complete event, so skipped time is never reported', () => {
+  const { timer, clock, events } = setup();
+  timer.start();
+  clock.advance(20 * MIN);
+  timer.reset();
+  timer.start();
+  clock.advance(20 * MIN);
+  timer.skip();
+  assert.equal(events.filter((e) => e.type === 'complete').length, 0);
 });
