@@ -212,6 +212,8 @@ export function createHistory({ storage = null, today = () => localDateKey() } =
   }
 
   // Latest retained days; picks up writes from other tabs while storage works.
+  // Days that aged out are removed from storage too, but only when there is
+  // something to remove, so repeated reads do not rewrite the history.
   function read() {
     if (storage) {
       try {
@@ -221,7 +223,9 @@ export function createHistory({ storage = null, today = () => localDateKey() } =
         storage = null;
       }
     }
-    days = prune(days, today()).days;
+    const { days: kept, removed } = prune(days, today());
+    if (removed) write(kept); // on failure, memory (already pruned) takes over
+    else days = kept;
     return days;
   }
 

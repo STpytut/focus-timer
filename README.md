@@ -73,10 +73,11 @@ background tab ran past the end are not counted.
 
 History is saved in `localStorage` under `focus-timer:history` as one record
 per local date (`YYYY-MM-DD`) with completed sessions and focus minutes.
-Today plus the previous 89 days are kept. Older days are removed from
-storage when the page loads and whenever a session is recorded, and they stop
-being shown or exported as soon as they age out, even if the page stays open
-past midnight. If storage is unavailable, holds invalid data, or a read or write
+Today plus the previous 89 days are kept. Older days are removed — from
+storage as well as from what is shown and exported — when the page loads and
+whenever the history is read after a day has aged out (the dots and Stats
+refresh every minute, so this also happens if the page stays open past
+midnight). Storage is only rewritten when something was actually removed. If storage is unavailable, holds invalid data, or a read or write
 fails (for example when full), the history is kept in memory for the current
 page and the stored copy is left alone. Invalid individual days in an
 otherwise valid history are ignored. Open tabs pick up sessions recorded in

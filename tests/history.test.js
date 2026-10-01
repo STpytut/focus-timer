@@ -271,17 +271,80 @@ test('prunes exactly at the 90-day boundary on load, and stores the result', () 
   assert.equal(history.csv(), `${CSV_HEADER}\n2026-07-04,2,50\n2026-10-01,1,25\n`);
 });
 
-test('prunes days that age out while the page stays open', () => {
+test('prunes days that age out while the page stays open, in storage too', () => {
   let day = '2026-10-01';
   const storage = memoryStorage({
-    [HISTORY_KEY]: historyJSON({ '2026-07-04': { sessions: 2, minutes: 50 } }),
+    [HISTORY_KEY]: historyJSON({
+      '2026-07-04': { sessions: 2, minutes: 50 },
+      '2026-07-05': { sessions: 1, minutes: 25 },
+    }),
   });
+  let writes = 0;
+  const setItem = storage.setItem;
+  storage.setItem = (k, v) => {
+    writes += 1;
+    setItem(k, v);
+  };
   const history = createHistory({ storage, today: () => day });
-  assert.deepEqual(Object.keys(history.snapshot()), ['2026-07-04']);
+  assert.deepEqual(Object.keys(history.snapshot()), ['2026-07-04', '2026-07-05']);
+  assert.equal(writes, 0); // nothing expired yet: no write
+
   day = '2026-10-02';
-  assert.deepEqual(history.snapshot(), {});
+  // A read alone (e.g. the periodic Stats / dots refresh) persists the pruning.
+  assert.deepEqual(Object.keys(history.snapshot()), ['2026-07-05']);
+  assert.deepEqual(stored(storage), { '2026-07-05': { sessions: 1, minutes: 25 } });
+  assert.equal(writes, 1);
+
+  // Further reads with nothing to remove do not write again.
+  history.snapshot();
+  history.stats();
+  history.todaySessions();
+  history.csv();
+  assert.equal(writes, 1);
+
+  day = '2026-10-03';
+  assert.equal(history.stats().recordedDays, 0);
+  assert.deepEqual(stored(storage), {});
+  assert.equal(writes, 2);
+
   history.recordSession(25 * MIN);
-  assert.deepEqual(stored(storage), { '2026-10-02': { sessions: 1, minutes: 25 } });
+  assert.deepEqual(stored(storage), { '2026-10-03': { sessions: 1, minutes: 25 } });
+});
+
+test('a failed pruning write keeps the retained days in memory and never restores stale data', () => {
+  let day = '2026-10-01';
+  let failWrites = false;
+  const storage = memoryStorage({
+    [HISTORY_KEY]: historyJSON({
+      '2026-07-04': { sessions: 2, minutes: 50 },
+      '2026-10-01': { sessions: 1, minutes: 25 },
+    }),
+  });
+  const setItem = storage.setItem;
+  storage.setItem = (k, v) => {
+    if (failWrites) throw new Error('QuotaExceededError');
+    setItem(k, v);
+  };
+  const history = createHistory({ storage, today: () => day });
+
+  day = '2026-10-02';
+  failWrites = true;
+  assert.deepEqual(history.snapshot(), { '2026-10-01': { sessions: 1, minutes: 25 } });
+  // The stored copy still has the expired day; it is left alone and ignored.
+  assert.deepEqual(Object.keys(stored(storage)), ['2026-07-04', '2026-10-01']);
+
+  // Even if storage later changes (another tab, or writes work again), the
+  // page keeps its in-memory history rather than reading stale values back.
+  failWrites = false;
+  setItem(HISTORY_KEY, historyJSON({ '2026-07-04': { sessions: 9, minutes: 9 }, '2026-10-01': { sessions: 9, minutes: 9 } }));
+  assert.deepEqual(history.snapshot(), { '2026-10-01': { sessions: 1, minutes: 25 } });
+  history.recordSession(10 * MIN);
+  assert.deepEqual(history.snapshot(), {
+    '2026-10-01': { sessions: 1, minutes: 25 },
+    '2026-10-02': { sessions: 1, minutes: 10 },
+  });
+  assert.equal(history.stats().streak, 2);
+  assert.equal(history.csv(), `${CSV_HEADER}\n2026-10-01,1,25\n2026-10-02,1,10\n`);
 });
 
 test('keeps a full 90-day window across a year boundary', () => {
