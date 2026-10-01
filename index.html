@@ -32,6 +32,11 @@
           </svg>
           <span class="visually-hidden">Settings</span>
         </button>
+        <button type="button" id="help-open" class="icon-button" aria-haspopup="dialog" aria-controls="help"
+          aria-keyshortcuts="Shift+?">
+          <span class="icon-glyph" aria-hidden="true">?</span>
+          <span class="visually-hidden">Keyboard shortcuts</span>
+        </button>
       </header>
 
       <div id="timer-view" class="view">
@@ -54,7 +59,7 @@
         </section>
 
         <p class="hint">
-          <kbd>Space</kbd> start / pause &nbsp;·&nbsp; <kbd>R</kbd> reset
+          <kbd>Space</kbd> start / pause &nbsp;·&nbsp; <kbd>R</kbd> reset &nbsp;·&nbsp; <kbd>?</kbd> all shortcuts
         </p>
       </div>
 
@@ -100,9 +105,9 @@
       <div id="announcer" class="visually-hidden" role="status" aria-live="polite"></div>
     </main>
 
-    <dialog id="settings" class="settings" aria-labelledby="settings-title">
-      <form id="settings-form" class="settings-form" novalidate>
-        <h2 id="settings-title" class="settings-title">Settings</h2>
+    <dialog id="settings" class="dialog" aria-labelledby="settings-title">
+      <form id="settings-form" class="dialog-body" novalidate>
+        <h2 id="settings-title" class="dialog-title">Settings</h2>
 
         <fieldset class="group">
           <legend>Lengths in minutes</legend>
@@ -156,6 +161,36 @@
           <button type="submit" class="button primary">Save</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="help" class="dialog dialog-narrow" aria-labelledby="help-title">
+      <div class="dialog-body">
+        <h2 id="help-title" class="dialog-title">Keyboard shortcuts</h2>
+        <dl class="shortcuts">
+          <div class="shortcut">
+            <dt><kbd>Space</kbd></dt>
+            <dd>Start, pause or resume the timer</dd>
+          </div>
+          <div class="shortcut">
+            <dt><kbd>R</kbd></dt>
+            <dd>Reset the current phase</dd>
+          </div>
+          <div class="shortcut">
+            <dt><kbd>?</kbd></dt>
+            <dd>Show this help</dd>
+          </div>
+          <div class="shortcut">
+            <dt><kbd>Esc</kbd></dt>
+            <dd>Close a dialog, or leave Stats</dd>
+          </div>
+        </dl>
+        <p class="field-hint">
+          <kbd>Space</kbd> and <kbd>R</kbd> work on the timer screen when no dialog is open and you are not typing.
+        </p>
+        <div class="dialog-actions">
+          <button type="button" id="help-close" class="button primary">Close</button>
+        </div>
+      </div>
     </dialog>
   </body>
 </html>

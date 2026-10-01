@@ -1,6 +1,6 @@
 // Wires the timer core, focus history, settings, sound, notifications and
-// keyboard shortcuts to the page, including the Settings dialog and the
-// Stats view.
+// keyboard shortcuts to the page, including the Settings and shortcut help
+// dialogs and the Stats view.
 
 import { createTimer, cycleText, formatTime, PHASES, STATUSES } from './timer.js';
 import { getSafeStorage, localDateKey } from './daily.js';
@@ -9,6 +9,7 @@ import { createSettingsStore, parseSettingsForm, toTimerConfig } from './setting
 import { createChime } from './sound.js';
 import { createNotifier, PERMISSION } from './notify.js';
 import { shortcutFor } from './keyboard.js';
+import { createHelpDialog } from './help.js';
 
 const TICK_MS = 250;
 const MAX_DOTS = 12;
@@ -42,6 +43,9 @@ const el = {
   settings: document.getElementById('settings'),
   settingsForm: document.getElementById('settings-form'),
   settingsCancel: document.getElementById('settings-cancel'),
+  helpOpen: document.getElementById('help-open'),
+  help: document.getElementById('help'),
+  helpClose: document.getElementById('help-close'),
   notifyStatus: document.getElementById('notify-status'),
   notifyRequest: document.getElementById('notify-request'),
   timerView: document.getElementById('timer-view'),
@@ -64,6 +68,14 @@ const timer = createTimer(toTimerConfig(settings.get()));
 const history = createHistory({ storage });
 const chime = createChime();
 const notifier = createNotifier();
+// Only one modal at a time: help never opens over Settings.
+const help = createHelpDialog({
+  dialog: el.help,
+  opener: el.helpOpen,
+  closeButton: el.helpClose,
+  document,
+  canOpen: () => !el.settings.open,
+});
 
 let loopId = null;
 let lastDailyCount = -1;
@@ -169,17 +181,23 @@ el.toggle.addEventListener('click', () => timer.toggle());
 el.reset.addEventListener('click', () => timer.reset());
 el.skip.addEventListener('click', () => timer.skip());
 
+const ACTIONS = {
+  toggle: () => timer.toggle(),
+  reset: () => timer.reset(),
+  help: () => help.open(),
+  closeHelp: () => help.close(),
+  closeStats: () => showTimer(),
+};
+
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && statsShown() && !el.settings.open) {
-    event.preventDefault();
-    showTimer();
-    return;
-  }
-  const action = shortcutFor(event, { modalOpen: el.settings.open, statsOpen: statsShown() });
+  const action = shortcutFor(event, {
+    modalOpen: el.settings.open,
+    helpOpen: help.isOpen(),
+    statsOpen: statsShown(),
+  });
   if (!action) return;
   event.preventDefault();
-  if (action === 'toggle') timer.toggle();
-  else timer.reset();
+  ACTIONS[action]();
 });
 
 // Browsers only allow audio after a user gesture, so prepare the chime on
@@ -222,6 +240,7 @@ function renderPermission() {
 }
 
 function openSettings() {
+  if (el.settings.open || help.isOpen()) return;
   fillForm(settings.get()); // always start from the saved values
   renderPermission();
   el.settings.showModal();

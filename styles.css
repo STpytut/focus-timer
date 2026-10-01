@@ -182,6 +182,7 @@ body[data-status="paused"] .time {
   border-radius: 50%;
   background: transparent;
   color: var(--muted);
+  font: inherit;
   cursor: pointer;
 }
 
@@ -425,9 +426,9 @@ kbd {
   gap: 0.5rem 0.75rem;
 }
 
-/* Settings dialog */
+/* Dialogs: Settings and keyboard shortcut help share one surface */
 
-.settings {
+.dialog {
   width: min(28rem, calc(100vw - 1.5rem));
   max-height: calc(100vh - 1.5rem);
   max-height: calc(100dvh - 1.5rem);
@@ -440,11 +441,11 @@ kbd {
   border-radius: 1.25rem;
 }
 
-.settings::backdrop {
+.dialog::backdrop {
   background: rgb(0 0 0 / 0.45);
 }
 
-.settings-form {
+.dialog-body {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -452,10 +453,43 @@ kbd {
   text-align: left;
 }
 
-.settings-title {
+.dialog-title {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
+}
+
+.dialog-narrow {
+  width: min(24rem, calc(100vw - 1.5rem));
+}
+
+.shortcuts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.shortcut {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.shortcut dt {
+  text-align: right;
+}
+
+.shortcut dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.icon-glyph {
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .group {
@@ -587,12 +621,17 @@ kbd {
     padding: 0.6rem 1rem;
   }
 
-  .settings-form {
+  .dialog-body {
     padding: 1.25rem 1rem;
   }
 
   .dialog-actions .button {
     flex: 1 1 auto;
+  }
+
+  .shortcut {
+    grid-template-columns: 3.5rem 1fr;
+    gap: 0.5rem;
   }
 
   .chart-figure {
