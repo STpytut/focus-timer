@@ -518,3 +518,96 @@ test('picks up sessions recorded by another tab', () => {
   assert.equal(a.todaySessions(), 2);
   assert.deepEqual(stored(storage), { '2026-10-01': { sessions: 2, minutes: 50 } });
 });
+
+test('resetToday removes only today and keeps other days', () => {
+  const storage = memoryStorage({
+    [HISTORY_KEY]: historyJSON({
+      '2026-09-29': { sessions: 2, minutes: 50 },
+      '2026-09-30': { sessions: 1, minutes: 25 },
+      '2026-10-01': { sessions: 3, minutes: 75 },
+    }),
+  });
+  const history = createHistory({ storage, today: () => '2026-10-01' });
+  assert.deepEqual(history.resetToday(), { date: '2026-10-01', cleared: true });
+  const expected = {
+    '2026-09-29': { sessions: 2, minutes: 50 },
+    '2026-09-30': { sessions: 1, minutes: 25 },
+  };
+  assert.deepEqual(history.snapshot(), expected);
+  assert.deepEqual(stored(storage), expected);
+  const stats = history.stats();
+  assert.equal(stats.todaySessions, 0);
+  assert.equal(stats.todayMinutes, 0);
+  assert.equal(stats.streak, 2); // continues from yesterday
+  // Reload does not resurrect it.
+  const reloaded = createHistory({ storage, today: () => '2026-10-01' });
+  assert.deepEqual(reloaded.snapshot(), expected);
+  assert.equal(reloaded.todaySessions(), 0);
+});
+
+test('resetToday on a today-only streak gives zero and repeat resets are no-ops', () => {
+  const storage = memoryStorage();
+  const history = createHistory({ storage, today: () => '2026-10-01' });
+  history.recordSession(25 * MIN);
+  assert.equal(history.stats().streak, 1);
+  history.resetToday();
+  assert.equal(history.stats().streak, 0);
+  assert.equal(history.stats().recordedDays, 0);
+  const before = storage.getItem(HISTORY_KEY);
+  assert.deepEqual(history.resetToday(), { date: '2026-10-01', cleared: false });
+  assert.equal(storage.getItem(HISTORY_KEY), before);
+});
+
+test('sessions record normally after resetToday', () => {
+  const history = createHistory({ storage: memoryStorage(), today: () => '2026-10-01' });
+  history.recordSession(25 * MIN);
+  history.recordSession(25 * MIN);
+  history.resetToday();
+  assert.deepEqual(history.recordSession(10 * MIN), { sessions: 1, minutes: 10 });
+  assert.equal(history.todaySessions(), 1);
+});
+
+test('resetToday resolves the date when called', () => {
+  let day = '2026-10-01';
+  const history = createHistory({ storage: memoryStorage(), today: () => day });
+  history.recordSession(25 * MIN);
+  day = '2026-10-02';
+  history.recordSession(25 * MIN);
+  assert.equal(history.resetToday().date, '2026-10-02');
+  assert.deepEqual(history.snapshot(), { '2026-10-01': { sessions: 1, minutes: 25 } });
+});
+
+test('resetToday clears a carried-over legacy count and it does not return', () => {
+  const storage = memoryStorage({ [LEGACY_KEY]: JSON.stringify({ date: '2026-10-01', count: 4 }) });
+  const history = createHistory({ storage, today: () => '2026-10-01' });
+  assert.equal(history.todaySessions(), 4);
+  history.resetToday();
+  assert.equal(history.todaySessions(), 0);
+  const reloaded = createHistory({ storage, today: () => '2026-10-01' });
+  assert.equal(reloaded.todaySessions(), 0);
+});
+
+test('resetToday falls back to memory when storage fails', () => {
+  const storage = memoryStorage({
+    [HISTORY_KEY]: historyJSON({
+      '2026-09-30': { sessions: 1, minutes: 25 },
+      '2026-10-01': { sessions: 2, minutes: 50 },
+    }),
+  });
+  const history = createHistory({ storage, today: () => '2026-10-01' });
+  storage.setItem = () => {
+    throw new Error('full');
+  };
+  history.resetToday();
+  assert.deepEqual(history.snapshot(), { '2026-09-30': { sessions: 1, minutes: 25 } });
+  history.recordSession(25 * MIN);
+  assert.equal(history.todaySessions(), 1);
+  assert.equal(history.stats().streak, 2);
+});
+
+test('resetToday works without storage', () => {
+  const history = createHistory({ storage: null, today: () => '2026-10-01' });
+  history.recordSession(25 * MIN);
+  history.resetToday();
+  assert.equal(history.todaySessions(), 0);
+});

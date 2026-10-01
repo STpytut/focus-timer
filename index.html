@@ -100,6 +100,9 @@
           <button type="button" id="stats-export" class="button" aria-describedby="stats-export-hint">Export CSV</button>
           <p id="stats-export-hint" class="stats-note">Downloads every day kept (up to 90).</p>
         </div>
+        <div class="stats-actions">
+          <button type="button" id="reset-today-open" class="button quiet" aria-haspopup="dialog" aria-controls="reset-today">Reset today</button>
+        </div>
       </section>
 
       <div id="announcer" class="visually-hidden" role="status" aria-live="polite"></div>
@@ -161,6 +164,19 @@
           <button type="submit" class="button primary">Save</button>
         </div>
       </form>
+    </dialog>
+
+    <dialog id="reset-today" class="dialog dialog-narrow" aria-labelledby="reset-today-title" aria-describedby="reset-today-text">
+      <div class="dialog-body">
+        <h2 id="reset-today-title" class="dialog-title">Reset today?</h2>
+        <p id="reset-today-text" class="field-hint">
+          Today’s completed sessions and focus minutes will be removed. Previous days are kept. This cannot be undone.
+        </p>
+        <div class="dialog-actions">
+          <button type="button" id="reset-today-cancel" class="button">Cancel</button>
+          <button type="button" id="reset-today-confirm" class="button primary">Reset today</button>
+        </div>
+      </div>
     </dialog>
 
     <dialog id="help" class="dialog dialog-narrow" aria-labelledby="help-title">

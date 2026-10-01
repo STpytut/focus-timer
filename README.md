@@ -72,6 +72,21 @@ with — even if you changed the length in Settings while it was running or
 paused. Skipped or reset focus time, breaks, paused time and time a
 background tab ran past the end are not counted.
 
+### Reset today
+
+**Reset today** (a small button at the bottom of Stats) removes today's
+completed sessions and focus minutes. It opens a confirmation dialog that
+says so and that previous days are kept; focus starts on **Cancel**.
+**Cancel** or `Escape` closes only the dialog, leaves the history unchanged
+and keeps Stats shown, returning focus to the Reset today button. **Reset
+today** in the dialog clears the current local day (resolved when you
+confirm, so it never clears yesterday after midnight) and immediately
+refreshes the dots, totals, chart, empty state and streak. Earlier days stay
+and the streak rule is unchanged: with no sessions today it ends yesterday,
+so a streak that only consisted of today becomes 0. The timer keeps running
+and is not affected, and later sessions are recorded as usual. Timer
+shortcuts and help do not fire while the confirmation is open.
+
 ### Storage and retention
 
 History is saved in `localStorage` under `focus-timer:history` as one record

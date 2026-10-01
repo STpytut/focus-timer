@@ -271,11 +271,27 @@ export function createHistory({ storage = null, today = () => localDateKey() } =
     };
   }
 
+  /**
+   * Removes only the current local day's record, resolved when called, so a
+   * confirmation that straddles midnight never clears yesterday. Other days
+   * and the streak rules are untouched.
+   * @returns {{date: string, cleared: boolean}} the day acted on and whether
+   *   it had a record
+   */
+  function resetToday() {
+    const key = today();
+    const current = read();
+    if (!(key in current)) return { date: key, cleared: false };
+    const { [key]: _removed, ...rest } = current;
+    write(rest);
+    return { date: key, cleared: true };
+  }
+
   function csv() {
     return toCSV(read());
   }
 
   init();
 
-  return { recordSession, todaySessions, snapshot, stats, csv };
+  return { recordSession, resetToday, todaySessions, snapshot, stats, csv };
 }
