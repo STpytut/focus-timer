@@ -1,8 +1,10 @@
-// Wires the timer core, daily counter, settings, sound, notifications and
-// keyboard shortcuts to the page.
+// Wires the timer core, focus history, settings, sound, notifications and
+// keyboard shortcuts to the page, including the Settings dialog and the
+// Stats view.
 
 import { createTimer, cycleText, formatTime, PHASES, STATUSES } from './timer.js';
-import { createDailyCounter, getSafeStorage } from './daily.js';
+import { getSafeStorage, localDateKey } from './daily.js';
+import { createHistory, parseDateKey } from './history.js';
 import { createSettingsStore, parseSettingsForm, toTimerConfig } from './settings.js';
 import { createChime } from './sound.js';
 import { createNotifier, PERMISSION } from './notify.js';
@@ -42,12 +44,24 @@ const el = {
   settingsCancel: document.getElementById('settings-cancel'),
   notifyStatus: document.getElementById('notify-status'),
   notifyRequest: document.getElementById('notify-request'),
+  timerView: document.getElementById('timer-view'),
+  statsOpen: document.getElementById('stats-open'),
+  statsView: document.getElementById('stats-view'),
+  statsTitle: document.getElementById('stats-title'),
+  statsBack: document.getElementById('stats-back'),
+  statToday: document.getElementById('stat-today'),
+  statTodaySessions: document.getElementById('stat-today-sessions'),
+  statWeek: document.getElementById('stat-week'),
+  statStreak: document.getElementById('stat-streak'),
+  chart: document.getElementById('chart'),
+  statsEmpty: document.getElementById('stats-empty'),
+  statsExport: document.getElementById('stats-export'),
 };
 
 const storage = getSafeStorage();
 const settings = createSettingsStore({ storage });
 const timer = createTimer(toTimerConfig(settings.get()));
-const daily = createDailyCounter({ storage });
+const history = createHistory({ storage });
 const chime = createChime();
 const notifier = createNotifier();
 
@@ -60,8 +74,12 @@ function toggleLabel(status) {
   return 'Start';
 }
 
+function plural(count, word) {
+  return `${count} ${count === 1 ? word : `${word}s`}`;
+}
+
 function renderDaily() {
-  const count = daily.get();
+  const count = history.todaySessions();
   if (count === lastDailyCount) return;
   lastDailyCount = count;
 
@@ -122,7 +140,10 @@ function onTick() {
 }
 
 function onComplete(event) {
-  if (event.phase === PHASES.WORK) daily.increment();
+  if (event.phase === PHASES.WORK) {
+    history.recordSession(event.durationMs);
+    if (statsShown()) renderStats();
+  }
   const finished = `${PHASE_LABELS[event.phase]} finished.`;
   const next = event.autoStarted
     ? `${PHASE_LABELS[event.nextPhase]} has started.`
@@ -149,7 +170,12 @@ el.reset.addEventListener('click', () => timer.reset());
 el.skip.addEventListener('click', () => timer.skip());
 
 document.addEventListener('keydown', (event) => {
-  const action = shortcutFor(event, { modalOpen: el.settings.open });
+  if (event.key === 'Escape' && statsShown() && !el.settings.open) {
+    event.preventDefault();
+    showTimer();
+    return;
+  }
+  const action = shortcutFor(event, { modalOpen: el.settings.open, statsOpen: statsShown() });
   if (!action) return;
   event.preventDefault();
   if (action === 'toggle') timer.toggle();
@@ -239,12 +265,118 @@ el.notifyRequest.addEventListener('click', async () => {
   if (el.notifyRequest.hidden && el.settings.open) el.notifyStatus.focus();
 });
 
+// --- Stats view ---
+
+const weekdayShort = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+const monthDay = new Intl.DateTimeFormat(undefined, { month: 'numeric', day: 'numeric' });
+const fullDate = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+
+function statsShown() {
+  return !el.statsView.hidden;
+}
+
+function formatMinutes(minutes) {
+  const total = Math.round(minutes);
+  if (total < 60) return `${total} min`;
+  const rest = total % 60;
+  return rest === 0 ? `${Math.floor(total / 60)} h` : `${Math.floor(total / 60)} h ${rest} min`;
+}
+
+function chartDay(day, isToday, max) {
+  const date = parseDateKey(day.date);
+  const item = document.createElement('li');
+  item.className = isToday ? 'chart-day is-today' : 'chart-day';
+
+  const count = document.createElement('span');
+  count.className = 'chart-count';
+  count.setAttribute('aria-hidden', 'true');
+  count.textContent = String(day.sessions);
+
+  // The track is always full height, so every day (zero too) has a labelled
+  // graphic for assistive technology.
+  const track = document.createElement('span');
+  track.className = 'chart-track';
+  track.setAttribute('role', 'img');
+  track.setAttribute(
+    'aria-label',
+    `${fullDate.format(date)}${isToday ? ' (today)' : ''}: ${plural(day.sessions, 'session')}, ${formatMinutes(day.minutes)}`,
+  );
+  const bar = document.createElement('span');
+  bar.className = 'chart-bar';
+  bar.style.height = `${(day.sessions / max) * 100}%`;
+  track.append(bar);
+
+  const label = document.createElement('span');
+  label.className = 'chart-label';
+  label.setAttribute('aria-hidden', 'true');
+  const weekday = document.createElement('span');
+  weekday.textContent = isToday ? 'Today' : weekdayShort.format(date);
+  const short = document.createElement('span');
+  short.textContent = monthDay.format(date);
+  label.append(weekday, short);
+
+  item.append(count, track, label);
+  return item;
+}
+
+function renderStats() {
+  const stats = history.stats(7);
+  el.statToday.textContent = formatMinutes(stats.todayMinutes);
+  el.statTodaySessions.textContent = plural(stats.todaySessions, 'session');
+  el.statWeek.textContent = formatMinutes(stats.weekMinutes);
+  el.statStreak.textContent = plural(stats.streak, 'day');
+  const max = Math.max(1, ...stats.days.map((day) => day.sessions));
+  el.chart.replaceChildren(...stats.days.map((day) => chartDay(day, day.date === stats.today, max)));
+  el.statsEmpty.hidden = stats.recordedDays > 0;
+}
+
+// The timer keeps running while Stats is shown; only the view changes.
+function showStats() {
+  renderStats();
+  el.timerView.hidden = true;
+  el.statsOpen.hidden = true;
+  el.statsView.hidden = false;
+  el.statsTitle.focus();
+}
+
+function showTimer() {
+  el.statsView.hidden = true;
+  el.timerView.hidden = false;
+  el.statsOpen.hidden = false;
+  render();
+  el.statsOpen.focus();
+}
+
+el.statsOpen.addEventListener('click', showStats);
+el.statsBack.addEventListener('click', showTimer);
+
+el.statsExport.addEventListener('click', () => {
+  const csv = history.csv();
+  const days = csv.trimEnd().split('\n').length - 1;
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `focus-timer-history-${localDateKey()}.csv`;
+  link.hidden = true;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Give the browser a moment to start the download before releasing it.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  announce(days === 0
+    ? 'No history yet. Exported a CSV with only the header row.'
+    : `Exported ${plural(days, 'day')} of history.`);
+});
+
 // Catch up immediately when returning to a throttled background tab.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') onTick();
 });
 
-// Refresh the daily count occasionally so it rolls over at midnight.
-setInterval(renderDaily, 60 * 1000);
+// Refresh the daily count and stats occasionally so they roll over at midnight.
+setInterval(() => {
+  renderDaily();
+  if (statsShown()) renderStats();
+}, 60 * 1000);
 
 render();

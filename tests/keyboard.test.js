@@ -38,3 +38,9 @@ test('all shortcuts are off while a modal dialog is open', () => {
   assert.equal(shortcutFor({ key: 'r', target: body }, { modalOpen: true }), null);
   assert.equal(shortcutFor({ key: 'r', target: body }, { modalOpen: false }), 'reset');
 });
+
+test('all shortcuts are off while the Stats view is shown', () => {
+  assert.equal(shortcutFor({ key: ' ', target: body }, { statsOpen: true }), null);
+  assert.equal(shortcutFor({ key: 'r', target: body }, { statsOpen: true }), null);
+  assert.equal(shortcutFor({ key: ' ', target: body }, { statsOpen: false }), 'toggle');
+});

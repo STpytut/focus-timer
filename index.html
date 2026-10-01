@@ -14,6 +14,16 @@
     <main class="app">
       <header class="topbar">
         <h1 class="visually-hidden">Focus Timer</h1>
+        <button type="button" id="stats-open" class="icon-button" aria-controls="stats-view">
+          <svg aria-hidden="true" focusable="false" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 20h16" />
+            <path d="M7 16v-5" />
+            <path d="M12 16V6" />
+            <path d="M17 16v-8" />
+          </svg>
+          <span class="visually-hidden">Stats</span>
+        </button>
         <button type="button" id="settings-open" class="icon-button" aria-haspopup="dialog" aria-controls="settings">
           <svg aria-hidden="true" focusable="false" width="24" height="24" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -24,27 +34,68 @@
         </button>
       </header>
 
-      <section class="timer" aria-labelledby="phase">
-        <h2 id="phase" class="phase">Focus</h2>
-        <p id="cycle" class="cycle">Session 1 of 4</p>
-        <p id="time" class="time" role="timer" aria-live="off" aria-atomic="true">25:00</p>
+      <div id="timer-view" class="view">
+        <section class="timer" aria-labelledby="phase">
+          <h2 id="phase" class="phase">Focus</h2>
+          <p id="cycle" class="cycle">Session 1 of 4</p>
+          <p id="time" class="time" role="timer" aria-live="off" aria-atomic="true">25:00</p>
 
-        <div class="controls">
-          <button type="button" id="toggle" class="button primary" aria-keyshortcuts="Space">Start</button>
-          <button type="button" id="reset" class="button" aria-keyshortcuts="R">Reset</button>
-          <button type="button" id="skip" class="button quiet">Skip to break</button>
+          <div class="controls">
+            <button type="button" id="toggle" class="button primary" aria-keyshortcuts="Space">Start</button>
+            <button type="button" id="reset" class="button" aria-keyshortcuts="R">Reset</button>
+            <button type="button" id="skip" class="button quiet">Skip to break</button>
+          </div>
+        </section>
+
+        <section class="today" aria-labelledby="today-heading">
+          <h2 id="today-heading" class="today-heading">Today</h2>
+          <div id="dots" class="dots" aria-hidden="true"></div>
+          <p id="today-count" class="today-count">No sessions completed yet today</p>
+        </section>
+
+        <p class="hint">
+          <kbd>Space</kbd> start / pause &nbsp;·&nbsp; <kbd>R</kbd> reset
+        </p>
+      </div>
+
+      <section id="stats-view" class="view stats" aria-labelledby="stats-title" hidden>
+        <div class="stats-header">
+          <button type="button" id="stats-back" class="button">
+            <span aria-hidden="true">←</span> Back to timer
+          </button>
+        </div>
+        <h2 id="stats-title" class="stats-title" tabindex="-1">Stats</h2>
+
+        <dl class="metrics">
+          <div class="metric">
+            <dt>Focus today</dt>
+            <dd><span id="stat-today" class="metric-value">0 min</span>
+              <span id="stat-today-sessions" class="metric-sub">0 sessions</span></dd>
+          </div>
+          <div class="metric">
+            <dt>This week</dt>
+            <dd><span id="stat-week" class="metric-value">0 min</span>
+              <span class="metric-sub">since Monday</span></dd>
+          </div>
+          <div class="metric">
+            <dt>Daily streak</dt>
+            <dd><span id="stat-streak" class="metric-value">0 days</span>
+              <span class="metric-sub">in a row</span></dd>
+          </div>
+        </dl>
+
+        <figure class="chart-figure">
+          <figcaption id="chart-title" class="chart-title">Completed focus sessions, last 7 days</figcaption>
+          <ol id="chart" class="chart" aria-labelledby="chart-title"></ol>
+        </figure>
+
+        <p id="stats-empty" class="stats-note" hidden>No completed focus sessions in the last 90 days yet.</p>
+
+        <div class="stats-actions">
+          <button type="button" id="stats-export" class="button" aria-describedby="stats-export-hint">Export CSV</button>
+          <p id="stats-export-hint" class="stats-note">Downloads every day kept (up to 90).</p>
         </div>
       </section>
-
-      <section class="today" aria-labelledby="today-heading">
-        <h2 id="today-heading" class="today-heading">Today</h2>
-        <div id="dots" class="dots" aria-hidden="true"></div>
-        <p id="today-count" class="today-count">No sessions completed yet today</p>
-      </section>
-
-      <p class="hint">
-        <kbd>Space</kbd> start / pause &nbsp;·&nbsp; <kbd>R</kbd> reset
-      </p>
 
       <div id="announcer" class="visually-hidden" role="status" aria-live="polite"></div>
     </main>
