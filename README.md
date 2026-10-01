@@ -9,8 +9,8 @@ system's light/dark preference and works on narrow phone screens.
   of 15 minutes; then a new cycle begins with focus.
 - A row of dots shows the focus sessions you completed today. The count is
   saved in `localStorage` and starts again at zero on a new local day. If
-  storage is unavailable or holds invalid data, the count is kept in memory
-  for the current page.
+  storage is unavailable, holds invalid data, or fails later (for example when
+  full), the count is kept in memory for the current page.
 
 ## Run it
 

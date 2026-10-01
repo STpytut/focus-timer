@@ -52,13 +52,15 @@ function parse(raw) {
 export function createDailyCounter({ storage = null, today = () => localDateKey() } = {}) {
   let memory = { date: today(), count: 0 };
 
+  // After any storage failure, stop using storage for this counter so a
+  // stale persisted value can never override the newer in-memory count.
   function read() {
     if (storage) {
       try {
         const stored = parse(storage.getItem(STORAGE_KEY));
         if (stored) memory = stored;
       } catch {
-        // keep memory value
+        storage = null;
       }
     }
     return memory;
@@ -70,7 +72,7 @@ export function createDailyCounter({ storage = null, today = () => localDateKey(
     try {
       storage.setItem(STORAGE_KEY, JSON.stringify(record));
     } catch {
-      // keep memory value
+      storage = null;
     }
   }
 

@@ -65,3 +65,59 @@ test('works in memory when storage is missing or throws', () => {
   assert.equal(counter.increment(), 2);
   assert.equal(counter.get(), 2);
 });
+
+// Storage that reads fine but fails every write (e.g. quota exceeded).
+function readOnlyStorage(initial) {
+  const storage = memoryStorage(initial);
+  storage.setItem = () => {
+    throw new Error('QuotaExceededError');
+  };
+  return storage;
+}
+
+test('keeps counting in memory when writes fail on readable existing storage', () => {
+  const storage = readOnlyStorage({
+    [STORAGE_KEY]: JSON.stringify({ date: '2026-10-01', count: 2 }),
+  });
+  const counter = createDailyCounter({ storage, today: () => '2026-10-01' });
+  assert.equal(counter.get(), 2);
+  assert.equal(counter.increment(), 3);
+  assert.equal(counter.get(), 3);
+  assert.equal(counter.increment(), 4);
+  assert.equal(counter.get(), 4);
+  // Stale persisted value is untouched and ignored.
+  assert.deepEqual(JSON.parse(storage.getItem(STORAGE_KEY)), { date: '2026-10-01', count: 2 });
+});
+
+test('rolls over while in memory fallback after a failed write', () => {
+  let day = '2026-10-01';
+  const storage = readOnlyStorage({
+    [STORAGE_KEY]: JSON.stringify({ date: '2026-10-01', count: 2 }),
+  });
+  const counter = createDailyCounter({ storage, today: () => day });
+  assert.equal(counter.increment(), 3);
+  day = '2026-10-02';
+  assert.equal(counter.get(), 0);
+  assert.equal(counter.increment(), 1);
+  assert.equal(counter.get(), 1);
+  day = '2026-10-03';
+  assert.equal(counter.get(), 0);
+});
+
+test('stops trusting storage after a failed read', () => {
+  let failRead = false;
+  const storage = memoryStorage({
+    [STORAGE_KEY]: JSON.stringify({ date: '2026-10-01', count: 5 }),
+  });
+  const getItem = storage.getItem;
+  storage.getItem = (k) => {
+    if (failRead) throw new Error('denied');
+    return getItem(k);
+  };
+  const counter = createDailyCounter({ storage, today: () => '2026-10-01' });
+  assert.equal(counter.get(), 5);
+  failRead = true;
+  assert.equal(counter.increment(), 6);
+  failRead = false;
+  assert.equal(counter.get(), 6);
+});
