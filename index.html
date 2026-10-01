@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="A calm, simple Pomodoro focus timer." />
+    <title>Focus Timer</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="src/app.js"></script>
+  </head>
+  <body data-phase="work" data-status="idle">
+    <main class="app">
+      <h1 class="visually-hidden">Focus Timer</h1>
+
+      <section class="timer" aria-labelledby="phase">
+        <h2 id="phase" class="phase">Focus</h2>
+        <p id="cycle" class="cycle">Session 1 of 4</p>
+        <p id="time" class="time" role="timer" aria-live="off" aria-atomic="true">25:00</p>
+
+        <div class="controls">
+          <button type="button" id="toggle" class="button primary" aria-keyshortcuts="Space">Start</button>
+          <button type="button" id="reset" class="button" aria-keyshortcuts="R">Reset</button>
+          <button type="button" id="skip" class="button quiet">Skip to break</button>
+        </div>
+      </section>
+
+      <section class="today" aria-labelledby="today-heading">
+        <h2 id="today-heading" class="today-heading">Today</h2>
+        <div id="dots" class="dots" aria-hidden="true"></div>
+        <p id="today-count" class="today-count">No sessions completed yet today</p>
+      </section>
+
+      <p class="hint">
+        <kbd>Space</kbd> start / pause &nbsp;·&nbsp; <kbd>R</kbd> reset
+      </p>
+
+      <div id="announcer" class="visually-hidden" role="status" aria-live="polite"></div>
+    </main>
+  </body>
+</html>

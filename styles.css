@@ -1,0 +1,248 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f5f3ef;
+  --surface: #fffdf9;
+  --text: #2b2a28;
+  --muted: #6b6760;
+  --border: #ddd8cf;
+  --accent: #b5543c;
+  --accent-text: #ffffff;
+  --focus: #1f5fbf;
+  --radius: 999px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+body[data-phase="shortBreak"] {
+  --accent: #3d7a64;
+}
+
+body[data-phase="longBreak"] {
+  --accent: #3d6690;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1c1e;
+    --surface: #242528;
+    --text: #ecebe8;
+    --muted: #a7a49e;
+    --border: #3a3b3f;
+    --accent: #e08a72;
+    --accent-text: #1b1c1e;
+    --focus: #8ab4ff;
+  }
+
+  body[data-phase="shortBreak"] {
+    --accent: #7cc3a7;
+  }
+
+  body[data-phase="longBreak"] {
+    --accent: #8fb5e0;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  transition: background-color 0.4s ease;
+}
+
+.app {
+  width: 100%;
+  max-width: 32rem;
+  padding: 2rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  text-align: center;
+}
+
+.timer {
+  width: 100%;
+  padding: 2rem 1.25rem 2.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+}
+
+.phase {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+
+.cycle {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.time {
+  margin: 0.75rem 0 1.5rem;
+  font-size: clamp(4rem, 22vw, 7.5rem);
+  font-weight: 300;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+body[data-status="paused"] .time {
+  opacity: 0.6;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.button {
+  min-height: 2.75rem;
+  min-width: 6.5rem;
+  padding: 0.6rem 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.button:hover {
+  border-color: var(--muted);
+}
+
+.button.primary {
+  min-width: 8rem;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.button.primary:hover {
+  filter: brightness(1.05);
+}
+
+.button.quiet {
+  border-color: transparent;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.button.quiet:hover {
+  color: var(--text);
+}
+
+.button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.today {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.today-heading {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 0.75rem;
+}
+
+.dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.more {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.today-count {
+  margin: 0;
+  color: var(--muted);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+kbd {
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 360px) {
+  .app {
+    padding: 1.25rem 0.75rem;
+  }
+
+  .button {
+    min-width: 0;
+    padding: 0.6rem 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
