@@ -60,6 +60,10 @@ const el = {
   chart: document.getElementById('chart'),
   statsEmpty: document.getElementById('stats-empty'),
   statsExport: document.getElementById('stats-export'),
+  resetOpen: document.getElementById('reset-today-open'),
+  resetDialog: document.getElementById('reset-today'),
+  resetCancel: document.getElementById('reset-today-cancel'),
+  resetConfirm: document.getElementById('reset-today-confirm'),
 };
 
 const storage = getSafeStorage();
@@ -68,13 +72,23 @@ const timer = createTimer(toTimerConfig(settings.get()));
 const history = createHistory({ storage });
 const chime = createChime();
 const notifier = createNotifier();
-// Only one modal at a time: help never opens over Settings.
+// Only one modal at a time: help never opens over Settings or the reset
+// confirmation.
 const help = createHelpDialog({
   dialog: el.help,
   opener: el.helpOpen,
   closeButton: el.helpClose,
   document,
-  canOpen: () => !el.settings.open,
+  canOpen: () => !el.settings.open && !el.resetDialog.open,
+});
+// Same dialog behaviour as help: Cancel is focused first, and focus returns
+// to the Reset today button however the dialog closes.
+const resetConfirmation = createHelpDialog({
+  dialog: el.resetDialog,
+  opener: el.resetOpen,
+  closeButton: el.resetCancel,
+  document,
+  canOpen: () => !el.settings.open && !help.isOpen(),
 });
 
 let loopId = null;
@@ -191,7 +205,7 @@ const ACTIONS = {
 
 document.addEventListener('keydown', (event) => {
   const action = shortcutFor(event, {
-    modalOpen: el.settings.open,
+    modalOpen: el.settings.open || resetConfirmation.isOpen(),
     helpOpen: help.isOpen(),
     statsOpen: statsShown(),
   });
@@ -240,7 +254,7 @@ function renderPermission() {
 }
 
 function openSettings() {
-  if (el.settings.open || help.isOpen()) return;
+  if (el.settings.open || help.isOpen() || resetConfirmation.isOpen()) return;
   fillForm(settings.get()); // always start from the saved values
   renderPermission();
   el.settings.showModal();
@@ -385,6 +399,15 @@ el.statsExport.addEventListener('click', () => {
   announce(days === 0
     ? 'No history yet. Exported a CSV with only the header row.'
     : `Exported ${plural(days, 'day')} of history.`);
+});
+
+el.resetConfirm.addEventListener('click', () => {
+  // Resolved now, not when the dialog opened, so midnight cannot clear yesterday.
+  const { cleared } = history.resetToday();
+  resetConfirmation.close();
+  renderDaily();
+  renderStats();
+  announce(cleared ? 'Today’s sessions and focus minutes were reset.' : 'Nothing to reset for today.');
 });
 
 // Catch up immediately when returning to a throttled background tab.

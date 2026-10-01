@@ -150,3 +150,52 @@ test('Space and R do nothing while help is open; closing help over Stats stays o
   assert.deepEqual(actions, ['help', 'closeHelp']);
   assert.equal(press('Escape'), 'closeStats');
 });
+
+// The reset confirmation reuses the same dialog wiring; the page treats it
+// as a modal for shortcuts and as a reason to refuse opening help.
+function setupReset() {
+  const doc = fakeDocument();
+  const dialog = fakeDialog(doc);
+  const opener = fakeElement(doc, 'BUTTON');
+  const cancel = fakeElement(doc, 'BUTTON');
+  const state = { statsOpen: true, history: 'unchanged' };
+  const confirmation = createHelpDialog({ dialog, opener, closeButton: cancel, document: doc });
+  const help = createHelpDialog({
+    dialog: fakeDialog(doc), opener: fakeElement(doc, 'BUTTON'), closeButton: fakeElement(doc, 'BUTTON'),
+    document: doc, canOpen: () => !confirmation.isOpen(),
+  });
+  function press(key) {
+    const action = shortcutFor({ key, target: doc.activeElement }, {
+      modalOpen: confirmation.isOpen(), helpOpen: help.isOpen(), statsOpen: state.statsOpen,
+    });
+    if (action === 'closeStats') state.statsOpen = false;
+    if (action === 'help') help.open();
+    return action;
+  }
+  return { doc, dialog, opener, cancel, confirmation, help, state, press };
+}
+
+test('reset confirmation focuses Cancel and Cancel restores focus to the opener', () => {
+  const { doc, dialog, opener, cancel } = setupReset();
+  opener.focus();
+  opener.dispatch('click');
+  assert.equal(dialog.open, true);
+  assert.equal(doc.activeElement, cancel);
+  cancel.dispatch('click');
+  assert.equal(dialog.open, false);
+  assert.equal(doc.activeElement, opener);
+});
+
+test('Escape in the reset confirmation does not leave Stats; timer shortcuts and help are off', () => {
+  const { dialog, opener, confirmation, help, state, press } = setupReset();
+  opener.focus();
+  confirmation.open();
+  assert.equal(press(' '), null);
+  assert.equal(press('r'), null);
+  assert.equal(press('?'), null);
+  assert.equal(help.isOpen(), false);
+  assert.equal(press('Escape'), null); // native dialog closes itself
+  dialog.close();
+  assert.equal(state.statsOpen, true);
+  assert.equal(press('Escape'), 'closeStats');
+});

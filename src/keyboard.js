@@ -1,6 +1,6 @@
 // Maps keydown events to page shortcuts: Space toggles, R resets, ? opens the
 // shortcut help and Escape closes help or leaves Stats. Space and R are off
-// while a modal dialog (Settings or help) is open and while the Stats view
+// while a modal dialog (Settings, help or the reset confirmation) is open and while the Stats view
 // replaces the timer; ? still works from Stats.
 
 const EDITABLE = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
@@ -17,7 +17,7 @@ function isEditable(target) {
  * @param {{key: string, code?: string, repeat?: boolean, ctrlKey?: boolean,
  *   metaKey?: boolean, altKey?: boolean, target?: any}} event
  * @param {{modalOpen?: boolean, helpOpen?: boolean, statsOpen?: boolean}} [context]
- *   `modalOpen` is true while any modal dialog (Settings or help) is open.
+ *   `modalOpen` is true while any modal dialog (Settings, help or the reset confirmation) is open.
  * @returns {'toggle' | 'reset' | 'help' | 'closeHelp' | 'closeStats' | null}
  */
 export function shortcutFor(event, { modalOpen = false, helpOpen = false, statsOpen = false } = {}) {
