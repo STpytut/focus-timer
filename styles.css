@@ -8,6 +8,7 @@
   --accent: #b5543c;
   --accent-text: #ffffff;
   --focus: #1f5fbf;
+  --error: #a3261b;
   --radius: 999px;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
@@ -30,6 +31,7 @@ body[data-phase="longBreak"] {
     --accent: #e08a72;
     --accent-text: #1b1c1e;
     --focus: #8ab4ff;
+    --error: #ff9a8f;
   }
 
   body[data-phase="shortBreak"] {
@@ -162,6 +164,36 @@ body[data-status="paused"] .time {
   outline-offset: 3px;
 }
 
+.topbar {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -1.25rem;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.icon-button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
 .today {
   display: flex;
   flex-direction: column;
@@ -230,6 +262,158 @@ kbd {
   border: 0;
 }
 
+/* Settings dialog */
+
+.settings {
+  width: min(28rem, calc(100vw - 1.5rem));
+  max-height: calc(100vh - 1.5rem);
+  max-height: calc(100dvh - 1.5rem);
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+}
+
+.settings::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem 1.25rem;
+  text-align: left;
+}
+
+.settings-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.group legend {
+  padding: 0;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.group .field-hint {
+  grid-column: 1 / -1;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.field label {
+  font-weight: 500;
+}
+
+.field input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--muted);
+  border-radius: 0.6rem;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.field input[aria-invalid="true"] {
+  border-color: var(--error);
+  border-width: 2px;
+}
+
+.field-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.field-error {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--error);
+}
+
+.check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 0.75rem;
+}
+
+.check input {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0.6rem 0;
+  accent-color: var(--accent);
+}
+
+.check label {
+  padding: 0.5rem 0;
+  cursor: pointer;
+}
+
+.check .field-hint {
+  grid-column: 2;
+}
+
+.notify {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.notify .field-hint {
+  flex: 1 1 12rem;
+}
+
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.field input:focus-visible,
+.check input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+[hidden] {
+  display: none !important;
+}
+
 @media (max-width: 360px) {
   .app {
     padding: 1.25rem 0.75rem;
@@ -238,6 +422,14 @@ kbd {
   .button {
     min-width: 0;
     padding: 0.6rem 1rem;
+  }
+
+  .settings-form {
+    padding: 1.25rem 1rem;
+  }
+
+  .dialog-actions .button {
+    flex: 1 1 auto;
   }
 }
 
