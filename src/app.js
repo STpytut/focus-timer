@@ -4,12 +4,13 @@
 
 import { createTimer, cycleText, formatTime, PHASES, STATUSES } from './timer.js';
 import { getSafeStorage, localDateKey } from './daily.js';
-import { createHistory, parseDateKey } from './history.js';
+import { createHistory, KINDS, parseDateKey } from './history.js';
 import { createSettingsStore, parseSettingsForm, toTimerConfig } from './settings.js';
 import { createChime } from './sound.js';
 import { createNotifier, PERMISSION } from './notify.js';
 import { shortcutFor } from './keyboard.js';
 import { createHelpDialog } from './help.js';
+import { createExporter } from './export.js';
 
 const TICK_MS = 250;
 const MAX_DOTS = 12;
@@ -18,6 +19,12 @@ const PHASE_LABELS = {
   [PHASES.WORK]: 'Focus',
   [PHASES.SHORT_BREAK]: 'Short break',
   [PHASES.LONG_BREAK]: 'Long break',
+};
+
+const PHASE_KINDS = {
+  [PHASES.WORK]: KINDS.FOCUS,
+  [PHASES.SHORT_BREAK]: KINDS.SHORT_BREAK,
+  [PHASES.LONG_BREAK]: KINDS.LONG_BREAK,
 };
 
 const NUMBER_FIELDS = ['workMinutes', 'shortBreakMinutes', 'longBreakMinutes', 'sessionsBeforeLongBreak'];
@@ -166,10 +173,9 @@ function onTick() {
 }
 
 function onComplete(event) {
-  if (event.phase === PHASES.WORK) {
-    history.recordSession(event.durationMs);
-    if (statsShown()) renderStats();
-  }
+  history.recordCompletion(PHASE_KINDS[event.phase], event.durationMs);
+  if (statsShown()) renderStats();
+  exporter.sync();
   const finished = `${PHASE_LABELS[event.phase]} finished.`;
   const next = event.autoStarted
     ? `${PHASE_LABELS[event.nextPhase]} has started.`
@@ -361,6 +367,7 @@ function renderStats() {
   const max = Math.max(1, ...stats.days.map((day) => day.sessions));
   el.chart.replaceChildren(...stats.days.map((day) => chartDay(day, day.date === stats.today, max)));
   el.statsEmpty.hidden = stats.recordedDays > 0;
+  exporter.sync();
 }
 
 // The timer keeps running while Stats is shown; only the view changes.
@@ -383,22 +390,15 @@ function showTimer() {
 el.statsOpen.addEventListener('click', showStats);
 el.statsBack.addEventListener('click', showTimer);
 
-el.statsExport.addEventListener('click', () => {
-  const csv = history.csv();
-  const days = csv.trimEnd().split('\n').length - 1;
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `focus-timer-history-${localDateKey()}.csv`;
-  link.hidden = true;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  // Give the browser a moment to start the download before releasing it.
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  announce(days === 0
-    ? 'No history yet. Exported a CSV with only the header row.'
-    : `Exported ${plural(days, 'day')} of history.`);
+const exporter = createExporter({
+  button: el.statsExport,
+  count: () => history.stats(1).exportableSessions,
+  csv: () => history.sessionsCSV(),
+  filename: () => `focus-timer-sessions-${localDateKey()}.csv`,
+  announce,
+  document,
+  url: URL,
+  Blob,
 });
 
 el.resetConfirm.addEventListener('click', () => {
@@ -419,6 +419,7 @@ document.addEventListener('visibilitychange', () => {
 setInterval(() => {
   renderDaily();
   if (statsShown()) renderStats();
+  else exporter.sync();
 }, 60 * 1000);
 
 render();

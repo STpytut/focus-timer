@@ -6,17 +6,31 @@
 // page. After any read or write failure storage is no longer used, so a stale
 // stored value can never override newer in-memory data.
 //
+// Individual completed sessions (focus and breaks) are stored next to the
+// daily totals, each with its local date, ISO completion time, kind and
+// length in minutes, and follow the same retention and Reset today rules.
+// Daily totals stay focus-only. Sessions completed before records existed
+// are only known as aggregates, so no individual rows are invented for them.
+//
 // Carry-over: the first time a history is created, a valid legacy daily
 // count (focus-timer:daily) dated today becomes today's session count with
 // zero minutes, since the legacy record has no durations. The legacy key is
 // removed only after the history has been stored; once a history exists it
 // always takes precedence, so the legacy count is never added twice.
 
+import { buildSessionsCSV } from './csv.js';
 import { localDateKey, parseDailyRecord, STORAGE_KEY as LEGACY_KEY } from './daily.js';
 
 export const HISTORY_KEY = 'focus-timer:history';
 export const RETENTION_DAYS = 90;
 export const CSV_HEADER = 'date,completed_sessions,focus_minutes';
+
+export const KINDS = Object.freeze({
+  FOCUS: 'focus',
+  SHORT_BREAK: 'short break',
+  LONG_BREAK: 'long break',
+});
+const KIND_VALUES = new Set(Object.values(KINDS));
 
 const MINUTE = 60 * 1000;
 const VERSION = 1;
@@ -59,11 +73,26 @@ function validDay(value) {
   );
 }
 
+function validSession(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    parseDateKey(value.date) !== null &&
+    KIND_VALUES.has(value.kind) &&
+    typeof value.minutes === 'number' &&
+    Number.isFinite(value.minutes) &&
+    value.minutes > 0 &&
+    typeof value.completedAt === 'string' &&
+    !Number.isNaN(Date.parse(value.completedAt))
+  );
+}
+
 /**
- * Parses stored history. Returns null if the value is not a history at all;
- * individual invalid days are dropped.
+ * Parses stored history into `{ days, sessions }`, or null if the value is
+ * not a history at all. Invalid individual days and sessions are dropped; a
+ * history without sessions (older versions) has an empty list.
  */
-export function parseHistory(raw) {
+export function parseStored(raw) {
   if (typeof raw !== 'string') return null;
   let value;
   try {
@@ -78,11 +107,31 @@ export function parseHistory(raw) {
   for (const [key, day] of Object.entries(value.days)) {
     if (parseDateKey(key) && validDay(day)) days[key] = { sessions: day.sessions, minutes: day.minutes };
   }
-  return days;
+  const sessions = Array.isArray(value.sessions)
+    ? value.sessions.filter(validSession).map((s) => ({
+        date: s.date,
+        kind: s.kind,
+        minutes: s.minutes,
+        completedAt: s.completedAt,
+      }))
+    : [];
+  return { days, sessions };
 }
 
-function serialize(days) {
-  return JSON.stringify({ version: VERSION, days });
+/** Parses stored history days only; see parseStored. */
+export function parseHistory(raw) {
+  return parseStored(raw)?.days ?? null;
+}
+
+function serialize(days, sessions) {
+  return JSON.stringify({ version: VERSION, days, sessions });
+}
+
+/** Drops sessions older than the retention window. */
+export function pruneSessions(sessions, todayKey) {
+  const start = retentionStart(todayKey);
+  const kept = sessions.filter((s) => s.date >= start);
+  return { sessions: kept, removed: kept.length !== sessions.length };
 }
 
 /** Drops days older than the retention window. */
@@ -154,15 +203,18 @@ export function toCSV(days) {
  * @param {object} [options]
  * @param {Storage | null} [options.storage]
  * @param {() => string} [options.today] Returns the current local date key.
+ * @param {() => Date | number} [options.now] Time source for completion times.
  */
-export function createHistory({ storage = null, today = () => localDateKey() } = {}) {
+export function createHistory({ storage = null, today = () => localDateKey(), now = () => new Date() } = {}) {
   let days = {}; // authoritative whenever storage is unavailable
+  let sessions = []; // individual completed sessions, oldest first
 
-  function write(next) {
-    days = next;
+  function write(nextDays, nextSessions = sessions) {
+    days = nextDays;
+    sessions = nextSessions;
     if (!storage) return false;
     try {
-      storage.setItem(HISTORY_KEY, serialize(next));
+      storage.setItem(HISTORY_KEY, serialize(nextDays, nextSessions));
       return true;
     } catch {
       storage = null;
@@ -194,10 +246,14 @@ export function createHistory({ storage = null, today = () => localDateKey() } =
     // already happened; the legacy key is only removed once a valid history
     // is known to be stored.
     if (raw !== null) {
-      const parsed = parseHistory(raw);
-      const { days: kept, removed } = prune(parsed ?? {}, today());
-      if (removed) write(kept);
-      else days = kept;
+      const parsed = parseStored(raw);
+      const pruned = prune(parsed?.days ?? {}, today());
+      const prunedSessions = pruneSessions(parsed?.sessions ?? [], today());
+      if (pruned.removed || prunedSessions.removed) write(pruned.days, prunedSessions.sessions);
+      else {
+        days = pruned.days;
+        sessions = prunedSessions.sessions;
+      }
       if (parsed) removeLegacy();
       return;
     }
@@ -208,7 +264,7 @@ export function createHistory({ storage = null, today = () => localDateKey() } =
       next[key] = { sessions: legacy.count, minutes: 0 };
     }
     // Storing even an empty history marks the carry-over as done.
-    if (write(next)) removeLegacy();
+    if (write(next, [])) removeLegacy();
   }
 
   // Latest retained days; picks up writes from other tabs while storage works.
@@ -217,32 +273,54 @@ export function createHistory({ storage = null, today = () => localDateKey() } =
   function read() {
     if (storage) {
       try {
-        const stored = parseHistory(storage.getItem(HISTORY_KEY));
-        if (stored) days = stored;
+        const stored = parseStored(storage.getItem(HISTORY_KEY));
+        if (stored) {
+          days = stored.days;
+          sessions = stored.sessions;
+        }
       } catch {
         storage = null;
       }
     }
-    const { days: kept, removed } = prune(days, today());
-    if (removed) write(kept); // on failure, memory (already pruned) takes over
-    else days = kept;
+    const pruned = prune(days, today());
+    const prunedSessions = pruneSessions(sessions, today());
+    if (pruned.removed || prunedSessions.removed) write(pruned.days, prunedSessions.sessions); // on failure, memory (already pruned) takes over
+    else {
+      days = pruned.days;
+      sessions = prunedSessions.sessions;
+    }
     return days;
   }
 
   /**
-   * Records one completed focus session of `durationMs` on today's date.
-   * @returns {{sessions: number, minutes: number}} today's totals
+   * Records one completed phase of `durationMs` on today's date. Every kind
+   * gets an individual session record; only focus counts towards the daily
+   * totals, streak and weekly minutes.
+   * @returns {{sessions: number, minutes: number}} today's focus totals
    */
-  function recordSession(durationMs) {
+  function recordCompletion(kind, durationMs) {
+    if (!KIND_VALUES.has(kind)) throw new RangeError(`Unknown session kind: ${kind}`);
     if (typeof durationMs !== 'number' || !Number.isFinite(durationMs) || durationMs <= 0) {
       throw new RangeError('durationMs must be a positive number of milliseconds');
     }
     const key = today();
     const current = read();
     const day = dayOf(current, key);
-    const updated = { sessions: day.sessions + 1, minutes: day.minutes + durationMs / MINUTE };
-    write({ ...current, [key]: updated });
+    const updated =
+      kind === KINDS.FOCUS ? { sessions: day.sessions + 1, minutes: day.minutes + durationMs / MINUTE } : day;
+    const record = {
+      date: key,
+      kind,
+      minutes: durationMs / MINUTE,
+      completedAt: new Date(now()).toISOString(),
+    };
+    write(kind === KINDS.FOCUS ? { ...current, [key]: updated } : current, [...sessions, record]);
     return { ...updated };
+  }
+
+  /** Records one completed focus session; see recordCompletion. */
+  function recordSession(durationMs) {
+    return recordCompletion(KINDS.FOCUS, durationMs);
   }
 
   /** Completed sessions today. */
@@ -268,6 +346,7 @@ export function createHistory({ storage = null, today = () => localDateKey() } =
       streak: streak(current, key),
       days: lastDays(current, key, count),
       recordedDays: Object.keys(current).length,
+      exportableSessions: sessions.length,
     };
   }
 
@@ -281,9 +360,10 @@ export function createHistory({ storage = null, today = () => localDateKey() } =
   function resetToday() {
     const key = today();
     const current = read();
-    if (!(key in current)) return { date: key, cleared: false };
+    const hasSessions = sessions.some((s) => s.date === key);
+    if (!(key in current) && !hasSessions) return { date: key, cleared: false };
     const { [key]: _removed, ...rest } = current;
-    write(rest);
+    write(rest, sessions.filter((s) => s.date !== key));
     return { date: key, cleared: true };
   }
 
@@ -291,7 +371,18 @@ export function createHistory({ storage = null, today = () => localDateKey() } =
     return toCSV(read());
   }
 
+  /** Copies of all retained individual session records, oldest first. */
+  function sessionRecords() {
+    read();
+    return sessions.map((s) => ({ ...s }));
+  }
+
+  /** Per-session CSV (RFC 4180) of every retained completed session. */
+  function sessionsCSV() {
+    return buildSessionsCSV(sessionRecords());
+  }
+
   init();
 
-  return { recordSession, resetToday, todaySessions, snapshot, stats, csv };
+  return { recordCompletion, sessionRecords, sessionsCSV, recordSession, resetToday, todaySessions, snapshot, stats, csv };
 }
