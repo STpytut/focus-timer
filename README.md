@@ -15,6 +15,8 @@ system's light/dark preference and works on narrow phone screens.
 - **Stats** (the bar-chart button next to the gear) shows the last seven
   days, focus time today and this week, your daily streak, and exports your
   history as CSV. History is kept for 90 days in `localStorage`.
+- **Keyboard shortcuts** (the `?` button after the gear, or press `?`) lists
+  every shortcut.
 
 ## Run it
 
@@ -46,7 +48,8 @@ replaces the timer on the page; **Back to timer** (or `Escape`) returns to
 it. The timer keeps running and keeps all its state while Stats is shown, and
 a session that finishes meanwhile shows up in Stats immediately. Opening
 Stats moves keyboard focus to its heading; going back returns focus to the
-Stats button. The `Space` / `R` timer shortcuts are off while Stats is shown.
+Stats button. The `Space` / `R` timer shortcuts are off while Stats is shown;
+`?` still opens the shortcut help, and `Escape` then closes only the help.
 
 What it shows (all by your device's local calendar day):
 
@@ -183,20 +186,36 @@ to about a minute in some browsers); the countdown itself stays accurate.
 
 ## Keyboard shortcuts
 
-| Key     | Action                       |
-| ------- | ---------------------------- |
-| `Space` | Start / pause / resume       |
-| `R`     | Reset the current phase      |
+| Key      | Action                                   |
+| -------- | ---------------------------------------- |
+| `Space`  | Start / pause / resume                   |
+| `R`      | Reset the current phase                  |
+| `?`      | Show the keyboard shortcut help          |
+| `Escape` | Close the open dialog, or leave Stats    |
 
-Shortcuts are ignored while the Stats view is shown, for held-down (repeated) keys, with Ctrl/Cmd/Alt, and
-while typing in a text field. When a button has keyboard focus, `Space`
-activates that button as usual rather than also triggering the shortcut.
+`?` is usually typed as `Shift` + `/`; Shift is fine, but the shortcuts are
+ignored for held-down (repeated) keys, with Ctrl/Cmd/Alt, and while typing in
+a text field, select or editable area. When a button has keyboard focus,
+`Space` activates that button as usual rather than also triggering the
+shortcut. `Space` and `R` are off while the Stats view is shown or a dialog
+is open; `?` works from the timer and from Stats, but not while a dialog is
+open.
 
-The Settings dialog is a native modal `<dialog>`: focus moves to the first
-field when it opens, the rest of the page is inert so `Tab` cannot reach
-it, `Escape` closes the dialog like
-Cancel, and closing it in any way returns focus to the gear button. Timer
-shortcuts are off while it is open.
+`Escape` acts on the topmost layer only: it closes the shortcut help first
+(so closing help over Stats stays on Stats), otherwise it closes Settings like
+Cancel, otherwise it leaves Stats.
+
+Both dialogs are native modal `<dialog>` elements sharing one look, and only
+one is open at a time: the rest of the page is inert so `Tab` cannot reach
+it, and the timer keeps running underneath.
+
+- **Settings** — focus moves to the first field when it opens; `Escape`
+  closes it like Cancel, and closing it in any way returns focus to the gear
+  button.
+- **Keyboard shortcuts** — opens from the `?` button or the `?` key; focus
+  moves to its **Close** button. Closing it with Close or `Escape` returns
+  focus to whatever had focus before it opened (the `?` button if that is no
+  longer available).
 
 ## How the controls behave
 
@@ -235,12 +254,17 @@ the action has no further effect.
   daily count format (still exported, no longer used by the page).
 - `src/sound.js` — Web Audio chime.
 - `src/notify.js` — notification permission and display.
-- `src/keyboard.js` — keyboard shortcut mapping.
+- `src/keyboard.js` — keyboard shortcut mapping, including which layer
+  `Escape` closes.
+- `src/help.js` — keyboard shortcut help dialog: open/close and focus
+  restoration.
 - `src/app.js` — connects the above to the page, including the Settings
-  dialog and the Stats view.
+  and help dialogs and the Stats view.
 - `tests/` — `node:test` suites, one per module: `timer.test.js` (including
   the completed-duration contract used by the history), `history.test.js`
   (rollover, 90-day pruning, legacy carry-over, streak/week/7-day metrics,
   CSV, reload and storage failures), `settings.test.js`, `daily.test.js`,
-  `sound.test.js`, `notify.test.js` and `keyboard.test.js`. `app.js` is
-  browser-only and not covered by them.
+  `sound.test.js`, `notify.test.js`, `keyboard.test.js` and `help.test.js`
+  (help dialog wiring and focus restoration driven through the shortcut
+  mapping, on a small fake DOM). `app.js` is browser-only and not covered by
+  them.
