@@ -611,3 +611,146 @@ test('resetToday works without storage', () => {
   history.resetToday();
   assert.equal(history.todaySessions(), 0);
 });
+
+// --- Per-session records ---
+
+function sessionHistory(storage, extra = {}) {
+  let day = '2026-10-01';
+  let time = Date.parse('2026-10-01T09:00:00.000Z');
+  const history = createHistory({ storage, today: () => day, now: () => time, ...extra });
+  return { history, setDay: (d) => { day = d; }, setTime: (t) => { time = Date.parse(t); } };
+}
+
+test('records every kind with exact minutes, ISO time and deterministic order', () => {
+  const { history, setTime } = sessionHistory(null);
+  history.recordSession(25 * MIN);
+  setTime('2026-10-01T09:30:00.000Z');
+  history.recordCompletion('short break', 5 * MIN);
+  history.recordCompletion('long break', 15 * MIN);
+  history.recordCompletion('focus', 90 * 1000);
+  assert.deepEqual(history.sessionRecords().map((s) => [s.kind, s.minutes]), [
+    ['focus', 25], ['short break', 5], ['long break', 15], ['focus', 1.5],
+  ]);
+  assert.equal(history.sessionRecords()[0].completedAt, '2026-10-01T09:00:00.000Z');
+  assert.equal(
+    history.sessionsCSV(),
+    'date,kind,length_minutes\r\n2026-10-01,focus,25\r\n2026-10-01,short break,5\r\n2026-10-01,long break,15\r\n2026-10-01,focus,1.5\r\n',
+  );
+});
+
+test('breaks do not change focus metrics', () => {
+  const { history } = sessionHistory(null);
+  history.recordCompletion('short break', 5 * MIN);
+  const stats = history.stats();
+  assert.equal(stats.todaySessions, 0);
+  assert.equal(stats.todayMinutes, 0);
+  assert.equal(stats.streak, 0);
+  assert.equal(stats.exportableSessions, 1);
+  history.recordSession(25 * MIN);
+  assert.equal(history.stats().todaySessions, 1);
+});
+
+test('rejects unknown kinds and invalid durations', () => {
+  const { history } = sessionHistory(null);
+  assert.throws(() => history.recordCompletion('nap', MIN), RangeError);
+  assert.throws(() => history.recordCompletion('focus', 0), RangeError);
+  assert.equal(history.sessionRecords().length, 0);
+});
+
+test('session records are copies', () => {
+  const { history } = sessionHistory(null);
+  history.recordSession(MIN);
+  history.sessionRecords()[0].minutes = 99;
+  assert.equal(history.sessionRecords()[0].minutes, 1);
+});
+
+test('session records persist and reload, including other tabs', () => {
+  const storage = memoryStorage();
+  const a = sessionHistory(storage).history;
+  a.recordCompletion('long break', 15 * MIN);
+  const b = sessionHistory(storage).history;
+  assert.deepEqual(b.sessionRecords().map((s) => s.kind), ['long break']);
+  b.recordSession(25 * MIN);
+  assert.equal(a.sessionRecords().length, 2);
+});
+
+test('aggregate-only history keeps metrics and gets no fabricated rows', () => {
+  const storage = memoryStorage({ [HISTORY_KEY]: historyJSON({ '2026-10-01': { sessions: 3, minutes: 75 } }) });
+  const { history } = sessionHistory(storage);
+  assert.equal(history.stats().todaySessions, 3);
+  assert.equal(history.stats().exportableSessions, 0);
+  assert.equal(history.sessionsCSV(), 'date,kind,length_minutes\r\n');
+  history.recordSession(25 * MIN);
+  assert.equal(history.stats().todaySessions, 4);
+  assert.equal(history.sessionRecords().length, 1);
+});
+
+test('legacy daily count carries over without session rows', () => {
+  const storage = memoryStorage({ [LEGACY_KEY]: legacyJSON('2026-10-01', 2) });
+  const { history } = sessionHistory(storage);
+  assert.equal(history.stats().todaySessions, 2);
+  assert.equal(history.sessionRecords().length, 0);
+});
+
+test('invalid stored sessions are dropped', () => {
+  const good = { date: '2026-10-01', kind: 'focus', minutes: 25, completedAt: '2026-10-01T09:00:00.000Z' };
+  const storage = memoryStorage({
+    [HISTORY_KEY]: JSON.stringify({
+      version: 1,
+      days: {},
+      sessions: [
+        good,
+        { ...good, kind: 'nap' },
+        { ...good, minutes: -1 },
+        { ...good, minutes: 'x' },
+        { ...good, date: '2026-02-31' },
+        { ...good, completedAt: 'nope' },
+        null,
+      ],
+    }),
+  });
+  assert.equal(sessionHistory(storage).history.sessionRecords().length, 1);
+  const bad = memoryStorage({ [HISTORY_KEY]: JSON.stringify({ version: 1, days: {}, sessions: 'x' }) });
+  assert.equal(sessionHistory(bad).history.sessionRecords().length, 0);
+});
+
+test('sessions older than 90 days are pruned from memory and storage', () => {
+  const storage = memoryStorage();
+  const { history, setDay } = sessionHistory(storage);
+  history.recordSession(MIN);
+  setDay('2026-12-29'); // 2026-10-01 is 89 days back: still kept
+  assert.equal(history.sessionRecords().length, 1);
+  setDay('2026-12-30');
+  assert.equal(history.sessionRecords().length, 0);
+  assert.deepEqual(JSON.parse(storage.getItem(HISTORY_KEY)).sessions, []);
+});
+
+test('reset today removes today records including breaks, only today', () => {
+  const { history, setDay } = sessionHistory(null);
+  history.recordSession(25 * MIN);
+  setDay('2026-10-02');
+  history.recordSession(25 * MIN);
+  history.recordCompletion('short break', 5 * MIN);
+  assert.deepEqual(history.resetToday(), { date: '2026-10-02', cleared: true });
+  assert.deepEqual(history.sessionRecords().map((s) => s.date), ['2026-10-01']);
+  assert.equal(history.resetToday().cleared, false);
+});
+
+test('reset today clears a break-only day', () => {
+  const { history } = sessionHistory(null);
+  history.recordCompletion('long break', 15 * MIN);
+  assert.equal(history.resetToday().cleared, true);
+  assert.equal(history.sessionRecords().length, 0);
+});
+
+test('storage failures fall back to memory for session records', () => {
+  const { history } = sessionHistory(readOnlyStorage());
+  history.recordCompletion('short break', 5 * MIN);
+  history.recordSession(25 * MIN);
+  assert.equal(history.sessionRecords().length, 2);
+  const broken = memoryStorage();
+  broken.getItem = () => { throw new Error('denied'); };
+  const h = sessionHistory(broken).history;
+  h.recordSession(MIN);
+  assert.equal(h.sessionRecords().length, 1);
+});

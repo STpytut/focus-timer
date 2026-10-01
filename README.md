@@ -14,7 +14,7 @@ system's light/dark preference and works on narrow phone screens.
   again at zero on a new local day.
 - **Stats** (the bar-chart button next to the gear) shows the last seven
   days, focus time today and this week, your daily streak, and exports your
-  history as CSV. History is kept for 90 days in `localStorage`.
+  completed sessions as CSV. History is kept for 90 days in `localStorage`.
 - **Keyboard shortcuts** (the `?` button after the gear, or press `?`) lists
   every shortcut.
 
@@ -75,7 +75,8 @@ background tab ran past the end are not counted.
 ### Reset today
 
 **Reset today** (a small button at the bottom of Stats) removes today's
-completed sessions and focus minutes. It opens a confirmation dialog that
+completed sessions and focus minutes, including today's individual session
+records (breaks too). It opens a confirmation dialog that
 says so and that previous days are kept; focus starts on **Cancel**.
 **Cancel** or `Escape` closes only the dialog, leaves the history unchanged
 and keeps Stats shown, returning focus to the Reset today button. **Reset
@@ -90,8 +91,10 @@ shortcuts and help do not fire while the confirmation is open.
 ### Storage and retention
 
 History is saved in `localStorage` under `focus-timer:history` as one record
-per local date (`YYYY-MM-DD`) with completed sessions and focus minutes.
-Today plus the previous 89 days are kept. Older days are removed — from
+per local date (`YYYY-MM-DD`) with completed focus sessions and focus
+minutes, plus a list of individual completed sessions (local date, ISO
+completion time, kind and minutes) for all three phase kinds. Invalid session
+entries are ignored. Today plus the previous 89 days are kept. Older days and sessions are removed — from
 storage as well as from what is shown and exported — when the page loads and
 whenever the history is read after a day has aged out (the dots and Stats
 refresh every minute, so this also happens if the page stays open past
@@ -115,22 +118,32 @@ count again.
 
 ### CSV export
 
-**Export CSV** downloads `focus-timer-history-YYYY-MM-DD.csv` with every
-retained day, oldest first:
+**Export CSV** downloads `focus-timer-sessions-YYYY-MM-DD.csv` with one row
+per completed session (focus, short break and long break), oldest first, as
+RFC 4180 CSV with CRLF line endings:
 
 ```csv
-date,completed_sessions,focus_minutes
-2026-09-30,4,100
-2026-10-01,2,50
+date,kind,length_minutes
+2026-09-30,focus,25
+2026-09-30,short break,5
+2026-10-01,focus,25
+2026-10-01,long break,15
 ```
 
-- `date` — local calendar date, `YYYY-MM-DD`.
-- `completed_sessions` — completed focus sessions that day.
-- `focus_minutes` — total focus minutes that day (0 for sessions carried
-  over from the old daily count).
+- `date` — local calendar date the session completed, `YYYY-MM-DD`.
+- `kind` — `focus`, `short break` or `long break`.
+- `length_minutes` — the length the phase actually ran with (at most two
+  decimals).
 
-Only days with recorded sessions have rows. With no history yet, the file
-contains just the header row and the page says so.
+Skipped, reset or paused-and-abandoned phases are not recorded. Fields
+containing commas, double quotes or line breaks are quoted with quotes
+doubled. With no recorded sessions the button is disabled and nothing is
+downloaded; the Stats page says when there are no completed sessions.
+
+**Limitation:** sessions recorded before individual records existed (daily
+totals, or the old daily count) keep counting in the Stats metrics but have
+no per-session data, so they are not exported; rows are never invented from
+totals.
 
 ## Settings
 
@@ -264,7 +277,9 @@ the action has no further effect.
 - `src/settings.js` — settings defaults, validation and safe persistence.
 - `src/history.js` — per-day focus history: recording, 90-day retention,
   legacy carry-over, local calendar arithmetic, week/streak/7-day metrics
-  and CSV; safe storage with in-memory fallback.
+  and per-session records; safe storage with in-memory fallback.
+- `src/csv.js` — pure RFC 4180 session CSV builder.
+- `src/export.js` — Export CSV button behaviour with injected browser APIs.
 - `src/daily.js` — local date keys, safe storage detection and the legacy
   daily count format (still exported, no longer used by the page).
 - `src/sound.js` — Web Audio chime.
@@ -276,7 +291,7 @@ the action has no further effect.
 - `src/app.js` — connects the above to the page, including the Settings
   and help dialogs and the Stats view.
 - `tests/` — `node:test` suites, one per module: `timer.test.js` (including
-  the completed-duration contract used by the history), `history.test.js`
+  the completed-duration contract used by the history), `csv.test.js` (CSV and export wiring), `history.test.js`
   (rollover, 90-day pruning, legacy carry-over, streak/week/7-day metrics,
   CSV, reload and storage failures), `settings.test.js`, `daily.test.js`,
   `sound.test.js`, `notify.test.js`, `keyboard.test.js` and `help.test.js`
