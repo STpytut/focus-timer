@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createTimer,
   formatTime,
+  cycleText,
   DEFAULT_DURATIONS,
   PHASES,
   STATUSES,
@@ -47,6 +48,7 @@ test('default durations are 25/5/15 minutes with long break every 4 sessions', (
     cycleCompleted: 0,
     completedWorkSessions: 0,
     sessionsBeforeLongBreak: 4,
+    autoStart: false,
   });
 });
 
@@ -54,6 +56,7 @@ test('rejects invalid configuration', () => {
   assert.throws(() => createTimer({ durations: { work: 0 } }), RangeError);
   assert.throws(() => createTimer({ durations: { shortBreak: Number.NaN } }), RangeError);
   assert.throws(() => createTimer({ sessionsBeforeLongBreak: 0 }), RangeError);
+  assert.throws(() => createTimer({ autoStart: 'yes' }), TypeError);
 });
 
 test('counts down from elapsed time, not from ticks', () => {
@@ -68,7 +71,12 @@ test('counts down from elapsed time, not from ticks', () => {
 test('work completes into a stopped short break, then back to stopped work', () => {
   const { timer, clock, events } = setup();
   const done = finishPhase(timer, clock);
-  assert.deepEqual(done, { type: 'complete', phase: PHASES.WORK, nextPhase: PHASES.SHORT_BREAK });
+  assert.deepEqual(done, {
+    type: 'complete',
+    phase: PHASES.WORK,
+    nextPhase: PHASES.SHORT_BREAK,
+    autoStarted: false,
+  });
 
   let s = timer.getState();
   assert.equal(s.phase, PHASES.SHORT_BREAK);
@@ -340,4 +348,274 @@ test('formatTime rounds up to whole seconds', () => {
   assert.equal(formatTime(1), '00:01');
   assert.equal(formatTime(0), '00:00');
   assert.equal(formatTime(-50), '00:00');
+});
+
+// --- Custom configuration and live changes ---
+
+test('custom lengths and session threshold drive a full cycle', () => {
+  const { timer, clock } = setup({
+    durations: { work: 2 * MIN, shortBreak: MIN, longBreak: 3 * MIN },
+    sessionsBeforeLongBreak: 2,
+  });
+  const seen = [];
+  for (let i = 0; i < 5; i++) {
+    const s = timer.getState();
+    seen.push([s.phase, s.durationMs]);
+    finishPhase(timer, clock);
+  }
+  assert.deepEqual(seen, [
+    [PHASES.WORK, 2 * MIN],
+    [PHASES.SHORT_BREAK, MIN],
+    [PHASES.WORK, 2 * MIN],
+    [PHASES.LONG_BREAK, 3 * MIN],
+    [PHASES.WORK, 2 * MIN],
+  ]);
+  assert.equal(timer.getState().cycleCompleted, 1);
+  assert.equal(timer.getState().completedWorkSessions, 3);
+});
+
+test('a running phase keeps its captured length; later phases use the new ones', () => {
+  const { timer, clock, events } = setup();
+  timer.start();
+  clock.advance(10 * MIN);
+  timer.configure({ durations: { work: 50 * MIN, shortBreak: 7 * MIN } });
+
+  let s = timer.getState();
+  assert.equal(s.status, STATUSES.RUNNING);
+  assert.equal(s.remainingMs, 15 * MIN);
+  assert.equal(s.durationMs, 25 * MIN, 'durationMs describes the captured phase');
+
+  clock.advance(15 * MIN - 1);
+  assert.equal(timer.tick(), null);
+  clock.advance(1);
+  assert.equal(timer.tick().phase, PHASES.WORK);
+  s = timer.getState();
+  assert.equal(s.phase, PHASES.SHORT_BREAK);
+  assert.equal(s.durationMs, 7 * MIN);
+  assert.equal(s.remainingMs, 7 * MIN);
+
+  finishPhase(timer, clock);
+  assert.equal(timer.getState().durationMs, 50 * MIN);
+  assert.equal(events.filter((e) => e.type === 'complete').length, 2);
+});
+
+test('a paused phase keeps its remaining time and length through a change and resume', () => {
+  const { timer, clock } = setup();
+  timer.start();
+  clock.advance(5 * MIN);
+  timer.pause();
+  timer.configure({ durations: { work: 10 * MIN } });
+
+  let s = timer.getState();
+  assert.equal(s.status, STATUSES.PAUSED);
+  assert.equal(s.remainingMs, 20 * MIN);
+  assert.equal(s.durationMs, 25 * MIN);
+
+  timer.resume();
+  clock.advance(19 * MIN);
+  s = timer.getState();
+  assert.equal(s.remainingMs, MIN);
+  assert.equal(s.durationMs, 25 * MIN);
+  clock.advance(MIN);
+  assert.equal(timer.tick().phase, PHASES.WORK);
+});
+
+test('an idle phase takes the newest length', () => {
+  const { timer, clock } = setup();
+  timer.configure({ durations: { work: 40 * MIN } });
+  let s = timer.getState();
+  assert.equal(s.status, STATUSES.IDLE);
+  assert.equal(s.remainingMs, 40 * MIN);
+  assert.equal(s.durationMs, 40 * MIN);
+
+  // Also an idle phase that was reached by completion.
+  finishPhase(timer, clock);
+  timer.configure({ durations: { shortBreak: 9 * MIN } });
+  s = timer.getState();
+  assert.equal(s.phase, PHASES.SHORT_BREAK);
+  assert.equal(s.remainingMs, 9 * MIN);
+  assert.equal(s.durationMs, 9 * MIN);
+});
+
+test('reset after a live change uses the newest length', () => {
+  for (const pauseFirst of [false, true]) {
+    const { timer, clock } = setup();
+    timer.start();
+    clock.advance(3 * MIN);
+    if (pauseFirst) timer.pause();
+    timer.configure({ durations: { work: 30 * MIN } });
+    assert.equal(timer.getState().durationMs, 25 * MIN);
+    timer.reset();
+    const s = timer.getState();
+    assert.equal(s.status, STATUSES.IDLE);
+    assert.equal(s.remainingMs, 30 * MIN);
+    assert.equal(s.durationMs, 30 * MIN);
+  }
+});
+
+test('configure preserves progress and completed sessions', () => {
+  const { timer, clock } = setup();
+  for (let i = 0; i < 3; i++) finishPhase(timer, clock); // work, break, work
+  const before = timer.getState();
+  assert.equal(before.completedWorkSessions, 2);
+  assert.equal(before.cycleCompleted, 2);
+
+  timer.configure({
+    durations: { work: MIN, shortBreak: MIN, longBreak: MIN },
+    sessionsBeforeLongBreak: 6,
+    autoStart: true,
+  });
+  const after = timer.getState();
+  assert.equal(after.phase, before.phase);
+  assert.equal(after.completedWorkSessions, 2);
+  assert.equal(after.cycleCompleted, 2);
+  assert.equal(after.sessionsBeforeLongBreak, 6);
+  assert.equal(after.autoStart, true);
+});
+
+test('invalid configuration changes nothing', () => {
+  const { timer } = setup();
+  const before = timer.getState();
+  assert.throws(() => timer.configure({ durations: { work: 10 * MIN, shortBreak: -1 } }), RangeError);
+  assert.throws(() => timer.configure({ durations: { work: 10 * MIN }, sessionsBeforeLongBreak: 1.5 }), RangeError);
+  assert.throws(() => timer.configure({ durations: { work: 10 * MIN }, autoStart: 1 }), TypeError);
+  assert.deepEqual(timer.getState(), before);
+});
+
+test('lowering the threshold below current progress gives a long break on the next completion', () => {
+  const { timer, clock } = setup();
+  for (let i = 0; i < 6; i++) finishPhase(timer, clock); // 3 work sessions done
+  assert.equal(timer.getState().phase, PHASES.WORK);
+  assert.equal(timer.getState().cycleCompleted, 3);
+
+  timer.configure({ sessionsBeforeLongBreak: 2 });
+  assert.equal(timer.getState().cycleCompleted, 3, 'progress is kept');
+  assert.equal(finishPhase(timer, clock).nextPhase, PHASES.LONG_BREAK);
+  assert.equal(timer.getState().cycleCompleted, 4);
+  finishPhase(timer, clock);
+  assert.equal(timer.getState().cycleCompleted, 0);
+  assert.equal(finishPhase(timer, clock).nextPhase, PHASES.SHORT_BREAK);
+  finishPhase(timer, clock);
+  assert.equal(finishPhase(timer, clock).nextPhase, PHASES.LONG_BREAK);
+});
+
+test('lowering the threshold during a short break takes effect on the next work completion', () => {
+  const { timer, clock } = setup();
+  for (let i = 0; i < 5; i++) finishPhase(timer, clock); // in short break, 3 done
+  assert.equal(timer.getState().phase, PHASES.SHORT_BREAK);
+  timer.configure({ sessionsBeforeLongBreak: 2 });
+  assert.equal(timer.getState().phase, PHASES.SHORT_BREAK, 'current break is not replaced');
+  finishPhase(timer, clock);
+  assert.equal(finishPhase(timer, clock).nextPhase, PHASES.LONG_BREAK);
+});
+
+test('raising the threshold mid-cycle keeps progress and delays the long break', () => {
+  const { timer, clock } = setup();
+  for (let i = 0; i < 6; i++) finishPhase(timer, clock); // 3 done
+  timer.configure({ sessionsBeforeLongBreak: 5 });
+  assert.equal(finishPhase(timer, clock).nextPhase, PHASES.SHORT_BREAK);
+  finishPhase(timer, clock);
+  assert.equal(finishPhase(timer, clock).nextPhase, PHASES.LONG_BREAK);
+  assert.equal(timer.getState().cycleCompleted, 5);
+});
+
+test('cycleText stays truthful when the threshold changes', () => {
+  const state = (phase, cycleCompleted, sessionsBeforeLongBreak) => ({ phase, cycleCompleted, sessionsBeforeLongBreak });
+  assert.equal(cycleText(state(PHASES.WORK, 0, 4)), 'Session 1 of 4');
+  assert.equal(cycleText(state(PHASES.SHORT_BREAK, 2, 4)), '2 of 4 done');
+  assert.equal(cycleText(state(PHASES.LONG_BREAK, 4, 4)), '4 of 4 done · cycle complete');
+  // Threshold lowered below progress.
+  assert.equal(cycleText(state(PHASES.WORK, 3, 2)), 'Session 2 of 2');
+  assert.equal(cycleText(state(PHASES.SHORT_BREAK, 3, 2)), '3 done · long break after next session');
+  assert.equal(cycleText(state(PHASES.LONG_BREAK, 3, 2)), '3 sessions done · cycle complete');
+  // Threshold raised during a long break that was already earned.
+  assert.equal(cycleText(state(PHASES.LONG_BREAK, 4, 6)), '4 sessions done · cycle complete');
+});
+
+// --- Auto-start ---
+
+test('auto-start runs the next phase from the moment completion is observed', () => {
+  const { timer, clock, events } = setup({ autoStart: true });
+  const done = finishPhase(timer, clock);
+  assert.deepEqual(done, { type: 'complete', phase: PHASES.WORK, nextPhase: PHASES.SHORT_BREAK, autoStarted: true });
+  let s = timer.getState();
+  assert.equal(s.phase, PHASES.SHORT_BREAK);
+  assert.equal(s.status, STATUSES.RUNNING);
+  assert.equal(s.remainingMs, 5 * MIN);
+
+  clock.advance(5 * MIN);
+  assert.equal(timer.tick().nextPhase, PHASES.WORK);
+  s = timer.getState();
+  assert.equal(s.status, STATUSES.RUNNING);
+  assert.equal(s.remainingMs, 25 * MIN);
+  assert.equal(events.filter((e) => e.type === 'complete').length, 2);
+});
+
+test('auto-start uses the latest settings for the next phase', () => {
+  const { timer, clock } = setup();
+  timer.start();
+  clock.advance(MIN);
+  timer.configure({ durations: { shortBreak: 2 * MIN }, autoStart: true });
+  clock.advance(24 * MIN);
+  assert.equal(timer.tick().autoStarted, true);
+  const s = timer.getState();
+  assert.equal(s.status, STATUSES.RUNNING);
+  assert.equal(s.durationMs, 2 * MIN);
+  assert.equal(s.remainingMs, 2 * MIN);
+});
+
+test('auto-start does not cascade through unobserved phases after a late tick', () => {
+  const { timer, clock, events } = setup({ autoStart: true });
+  timer.start();
+  clock.advance(3 * 60 * MIN); // long-throttled background tab
+  assert.ok(timer.tick());
+  assert.equal(timer.tick(), null);
+  const s = timer.getState();
+  assert.equal(s.phase, PHASES.SHORT_BREAK);
+  assert.equal(s.status, STATUSES.RUNNING);
+  assert.equal(s.remainingMs, 5 * MIN, 'next phase is timed from observation');
+  assert.equal(s.completedWorkSessions, 1);
+  assert.equal(events.filter((e) => e.type === 'complete').length, 1);
+});
+
+test('overdue actions settle the completion once and do not act on the auto-started phase', () => {
+  for (const action of ['pause', 'toggle', 'reset', 'skip', 'start']) {
+    const { timer, clock, events } = setup({ autoStart: true });
+    timer.start();
+    clock.advance(25 * MIN + 10);
+    assert.equal(timer[action](), false, action);
+    const s = timer.getState();
+    assert.equal(s.phase, PHASES.SHORT_BREAK, action);
+    assert.equal(s.status, STATUSES.RUNNING, action);
+    assert.equal(s.remainingMs, 5 * MIN, action);
+    assert.equal(events.filter((e) => e.type === 'complete').length, 1, action);
+  }
+});
+
+test('skip and reset never auto-start', () => {
+  const { timer, clock } = setup({ autoStart: true });
+  timer.start();
+  clock.advance(MIN);
+  timer.skip();
+  assert.equal(timer.getState().phase, PHASES.SHORT_BREAK);
+  assert.equal(timer.getState().status, STATUSES.IDLE);
+  clock.advance(60 * MIN);
+  assert.equal(timer.tick(), null);
+
+  timer.start();
+  clock.advance(MIN);
+  timer.reset();
+  assert.equal(timer.getState().status, STATUSES.IDLE);
+  clock.advance(60 * MIN);
+  assert.equal(timer.tick(), null);
+  assert.equal(timer.getState().completedWorkSessions, 0);
+});
+
+test('turning auto-start off while running leaves the next phase stopped', () => {
+  const { timer, clock } = setup({ autoStart: true });
+  timer.start();
+  timer.configure({ autoStart: false });
+  clock.advance(25 * MIN);
+  assert.equal(timer.tick().autoStarted, false);
+  assert.equal(timer.getState().status, STATUSES.IDLE);
 });

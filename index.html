@@ -12,7 +12,17 @@
   </head>
   <body data-phase="work" data-status="idle">
     <main class="app">
-      <h1 class="visually-hidden">Focus Timer</h1>
+      <header class="topbar">
+        <h1 class="visually-hidden">Focus Timer</h1>
+        <button type="button" id="settings-open" class="icon-button" aria-haspopup="dialog" aria-controls="settings">
+          <svg aria-hidden="true" focusable="false" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          <span class="visually-hidden">Settings</span>
+        </button>
+      </header>
 
       <section class="timer" aria-labelledby="phase">
         <h2 id="phase" class="phase">Focus</h2>
@@ -38,5 +48,63 @@
 
       <div id="announcer" class="visually-hidden" role="status" aria-live="polite"></div>
     </main>
+
+    <dialog id="settings" class="settings" aria-labelledby="settings-title">
+      <form id="settings-form" class="settings-form" novalidate>
+        <h2 id="settings-title" class="settings-title">Settings</h2>
+
+        <fieldset class="group">
+          <legend>Lengths in minutes</legend>
+          <div class="field">
+            <label for="work-minutes">Focus</label>
+            <input id="work-minutes" name="workMinutes" type="number" inputmode="numeric"
+              min="1" max="90" step="1" required autofocus aria-describedby="work-minutes-error" />
+            <p id="work-minutes-error" class="field-error" hidden></p>
+          </div>
+          <div class="field">
+            <label for="short-break-minutes">Short break</label>
+            <input id="short-break-minutes" name="shortBreakMinutes" type="number" inputmode="numeric"
+              min="1" max="90" step="1" required aria-describedby="short-break-minutes-error" />
+            <p id="short-break-minutes-error" class="field-error" hidden></p>
+          </div>
+          <div class="field">
+            <label for="long-break-minutes">Long break</label>
+            <input id="long-break-minutes" name="longBreakMinutes" type="number" inputmode="numeric"
+              min="1" max="90" step="1" required aria-describedby="long-break-minutes-error" />
+            <p id="long-break-minutes-error" class="field-error" hidden></p>
+          </div>
+          <p class="field-hint">Whole minutes from 1 to 90.</p>
+        </fieldset>
+
+        <div class="field">
+          <label for="sessions">Focus sessions before a long break</label>
+          <input id="sessions" name="sessionsBeforeLongBreak" type="number" inputmode="numeric"
+            min="2" max="8" step="1" required aria-describedby="sessions-hint sessions-error" />
+          <p id="sessions-hint" class="field-hint">From 2 to 8.</p>
+          <p id="sessions-error" class="field-error" hidden></p>
+        </div>
+
+        <div class="check">
+          <input id="auto-start" name="autoStart" type="checkbox" aria-describedby="auto-start-hint" />
+          <label for="auto-start">Start the next phase automatically</label>
+          <p id="auto-start-hint" class="field-hint">Only when a phase finishes, not after Skip or Reset.</p>
+        </div>
+
+        <div class="check">
+          <input id="sound" name="sound" type="checkbox" />
+          <label for="sound">Play a chime when a phase ends</label>
+        </div>
+
+        <div class="notify">
+          <p id="notify-status" class="field-hint" tabindex="-1" aria-live="polite"></p>
+          <button type="button" id="notify-request" class="button">Allow notifications</button>
+        </div>
+
+        <div class="dialog-actions">
+          <button type="button" id="settings-cancel" class="button">Cancel</button>
+          <button type="submit" class="button primary">Save</button>
+        </div>
+      </form>
+    </dialog>
   </body>
 </html>

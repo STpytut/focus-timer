@@ -32,3 +32,9 @@ test('leaves Space to focused buttons so they act only once', () => {
   assert.equal(shortcutFor({ key: ' ', target: { tagName: 'DIV', getAttribute: () => 'button' } }), null);
   assert.equal(shortcutFor({ key: 'r', target: { tagName: 'BUTTON' } }), 'reset');
 });
+
+test('all shortcuts are off while a modal dialog is open', () => {
+  assert.equal(shortcutFor({ key: ' ', target: body }, { modalOpen: true }), null);
+  assert.equal(shortcutFor({ key: 'r', target: body }, { modalOpen: true }), null);
+  assert.equal(shortcutFor({ key: 'r', target: body }, { modalOpen: false }), 'reset');
+});
