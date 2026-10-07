@@ -754,3 +754,62 @@ test('storage failures fall back to memory for session records', () => {
   h.recordSession(MIN);
   assert.equal(h.sessionRecords().length, 1);
 });
+
+function seedTwoDays() {
+  const ctx = sessionHistory(memoryStorage());
+  ctx.history.recordSession(25 * MIN); // 2026-10-01
+  ctx.setDay('2026-10-02');
+  ctx.history.recordSession(25 * MIN);
+  ctx.history.recordCompletion('short break', 5 * MIN);
+  return ctx;
+}
+
+test('reset today clears only today: totals, rows and streak, keeping earlier days', () => {
+  const { history } = seedTwoDays();
+  assert.equal(history.stats().streak, 2);
+  history.resetToday();
+  const stats = history.stats();
+  assert.equal(stats.todaySessions, 0);
+  assert.equal(stats.todayMinutes, 0);
+  assert.equal(stats.streak, 1); // ends yesterday
+  assert.deepEqual(history.snapshot(), { '2026-10-01': { sessions: 1, minutes: 25 } });
+  assert.deepEqual(history.sessionRecords().map((s) => s.date), ['2026-10-01']);
+});
+
+test('cancel changes nothing: history is identical when reset is never confirmed', () => {
+  const storage = memoryStorage();
+  const { history, setDay } = sessionHistory(storage);
+  history.recordSession(25 * MIN);
+  setDay('2026-10-02');
+  history.recordSession(25 * MIN);
+  const storedBefore = storage.getItem(HISTORY_KEY);
+  const snapshotBefore = history.snapshot();
+  const csvBefore = history.sessionsCSV();
+  // Cancel / Escape only close the dialog and never call resetToday.
+  assert.equal(storage.getItem(HISTORY_KEY), storedBefore);
+  assert.deepEqual(history.snapshot(), snapshotBefore);
+  assert.equal(history.sessionsCSV(), csvBefore);
+  assert.equal(history.stats().todaySessions, 1);
+});
+
+test('exports reflect reset immediately and a reload', () => {
+  const storage = memoryStorage();
+  const { history } = (() => {
+    const ctx = sessionHistory(storage);
+    ctx.history.recordSession(25 * MIN);
+    ctx.setDay('2026-10-02');
+    ctx.history.recordSession(25 * MIN);
+    ctx.history.recordCompletion('long break', 15 * MIN);
+    return ctx;
+  })();
+  assert.equal(history.stats().exportableSessions, 3);
+  history.resetToday();
+  assert.equal(history.stats().exportableSessions, 1);
+  const rows = history.sessionsCSV().trim().split('\n');
+  assert.equal(rows.length, 2); // header + yesterday's session
+  assert.ok(rows[1].startsWith('2026-10-01,'));
+  assert.ok(!history.sessionsCSV().includes('2026-10-02'));
+  assert.equal(history.csv(), 'date,completed_sessions,focus_minutes\n2026-10-01,1,25\n');
+  const reloaded = sessionHistory(storage).history;
+  assert.equal(reloaded.sessionRecords().length, 1);
+});
