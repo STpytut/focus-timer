@@ -14,6 +14,7 @@ import {
   weekMinutes,
   weekStart,
 } from '../src/history.js';
+import { createHelpDialog } from '../src/help.js';
 import { STORAGE_KEY as LEGACY_KEY } from '../src/daily.js';
 
 const MIN = 60 * 1000;
@@ -776,20 +777,75 @@ test('reset today clears only today: totals, rows and streak, keeping earlier da
   assert.deepEqual(history.sessionRecords().map((s) => s.date), ['2026-10-01']);
 });
 
-test('cancel changes nothing: history is identical when reset is never confirmed', () => {
+test('cancel and Escape through the confirmation dialog change nothing and restore focus', () => {
   const storage = memoryStorage();
   const { history, setDay } = sessionHistory(storage);
   history.recordSession(25 * MIN);
   setDay('2026-10-02');
   history.recordSession(25 * MIN);
+  history.recordCompletion('short break', 5 * MIN);
+
+  // Minimal fake DOM, wired like the page: only the confirm button resets.
+  const doc = { activeElement: null };
+  const element = () => {
+    const listeners = {};
+    return {
+      isConnected: true,
+      closest: () => null,
+      addEventListener: (type, fn) => (listeners[type] ??= []).push(fn),
+      dispatch: (type) => (listeners[type] ?? []).forEach((fn) => fn({ type })),
+      focus() { doc.activeElement = this; },
+    };
+  };
+  const dialog = element();
+  dialog.open = false;
+  dialog.showModal = () => { dialog.open = true; };
+  dialog.close = () => {
+    if (!dialog.open) return;
+    dialog.open = false;
+    dialog.dispatch('close');
+  };
+  const opener = element();
+  const cancel = element();
+  const confirm = element();
+  createHelpDialog({ dialog, opener, closeButton: cancel, document: doc });
+  confirm.addEventListener('click', () => {
+    history.resetToday();
+    dialog.close();
+  });
+
   const storedBefore = storage.getItem(HISTORY_KEY);
-  const snapshotBefore = history.snapshot();
+  const statsBefore = history.stats();
   const csvBefore = history.sessionsCSV();
-  // Cancel / Escape only close the dialog and never call resetToday.
-  assert.equal(storage.getItem(HISTORY_KEY), storedBefore);
-  assert.deepEqual(history.snapshot(), snapshotBefore);
-  assert.equal(history.sessionsCSV(), csvBefore);
+  const unchanged = () => {
+    assert.equal(storage.getItem(HISTORY_KEY), storedBefore);
+    assert.deepEqual(history.stats(), statsBefore);
+    assert.equal(history.sessionsCSV(), csvBefore);
+    assert.equal(doc.activeElement, opener);
+  };
+
+  // Cancel button.
+  opener.focus();
+  opener.dispatch('click');
+  assert.equal(dialog.open, true);
+  assert.equal(doc.activeElement, cancel);
+  cancel.dispatch('click');
+  assert.equal(dialog.open, false);
+  unchanged();
+
+  // Escape: the native dialog closes itself, which fires 'close'.
+  opener.focus();
+  opener.dispatch('click');
+  assert.equal(dialog.open, true);
+  dialog.close();
+  unchanged();
   assert.equal(history.stats().todaySessions, 1);
+
+  // Sanity check that the wiring does reset when confirmed.
+  opener.dispatch('click');
+  confirm.dispatch('click');
+  assert.equal(history.stats().todaySessions, 0);
+  assert.equal(history.sessionRecords().length, 1);
 });
 
 test('exports reflect reset immediately and a reload', () => {
