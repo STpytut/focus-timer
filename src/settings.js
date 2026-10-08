@@ -14,11 +14,13 @@ export const DEFAULT_SETTINGS = Object.freeze({
   sessionsBeforeLongBreak: 4,
   autoStart: false,
   sound: false,
+  soundVolume: 100,
 });
 
 export const LIMITS = Object.freeze({
   minutes: Object.freeze({ min: 1, max: 90 }),
   sessions: Object.freeze({ min: 2, max: 8 }),
+  volume: Object.freeze({ min: 0, max: 100 }),
 });
 
 const INTEGER_FIELDS = {
@@ -26,6 +28,7 @@ const INTEGER_FIELDS = {
   shortBreakMinutes: LIMITS.minutes,
   longBreakMinutes: LIMITS.minutes,
   sessionsBeforeLongBreak: LIMITS.sessions,
+  soundVolume: LIMITS.volume,
 };
 const BOOLEAN_FIELDS = ['autoStart', 'sound'];
 

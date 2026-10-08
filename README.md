@@ -170,6 +170,7 @@ Open Settings with the gear button in the top-right corner.
 | Focus sessions before a long break  | 4       | whole number 2–8   |
 | Start the next phase automatically  | off     | on / off           |
 | Play a chime when a phase ends      | off     | on / off           |
+| Chime volume                        | 100%    | whole number 0–100 |
 
 - **Save** applies the settings; **Cancel** (or `Escape`) discards the
   changes. Invalid values are explained next to the field and nothing is
@@ -216,6 +217,10 @@ page, so the audio is prepared when you save with sound on and on any click
 or key press while it is on. If Web Audio is unavailable or blocked, the
 timer simply stays silent. The chime plays only when a phase finishes, not on
 Skip or Reset.
+
+The **Chime volume** slider (0–100%) scales the chime's loudness; 100% is the
+full chime level and 0% is silent. It is saved with the other settings, and
+settings stored before the slider existed use the default of 100%.
 
 ### Notifications
 

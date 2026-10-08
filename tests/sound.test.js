@@ -92,3 +92,36 @@ test('a closed context is replaced', async () => {
   assert.equal(await chime.play(), true);
   assert.equal(audio.count(), 2);
 });
+
+const peaks = (audio) => audio.log.filter(([n, k]) => n === 'gain' && k === 'ramp').filter((_, i) => i % 2 === 0).map((e) => e[2]);
+
+test('default and full volume use the original peak gain', async () => {
+  for (const args of [[], [100]]) {
+    const audio = fakeAudio({ state: 'running' });
+    assert.equal(await createChime({ AudioContextCtor: audio.FakeContext }).play(...args), true);
+    assert.deepEqual(peaks(audio), [0.2, 0.2]);
+  }
+});
+
+test('volume scales the peak gain and keeps the envelope shape', async () => {
+  const audio = fakeAudio({ state: 'running' });
+  await createChime({ AudioContextCtor: audio.FakeContext }).play(50);
+  assert.deepEqual(peaks(audio), [0.1, 0.1]);
+  const gain = audio.log.filter(([n]) => n === 'gain');
+  assert.equal(gain.length, 6);
+  assert.ok(gain[0][2] < 0.001 && gain[2][2] < 0.001);
+});
+
+test('volume zero is silent but still succeeds; out-of-range values are clamped', async () => {
+  const silent = fakeAudio({ state: 'running' });
+  assert.equal(await createChime({ AudioContextCtor: silent.FakeContext }).play(0), true);
+  assert.equal(silent.log.filter(([e]) => e === 'osc.start').length, 0);
+
+  const loud = fakeAudio({ state: 'running' });
+  await createChime({ AudioContextCtor: loud.FakeContext }).play(500);
+  assert.deepEqual(peaks(loud), [0.2, 0.2]);
+
+  const negative = fakeAudio({ state: 'running' });
+  await createChime({ AudioContextCtor: negative.FakeContext }).play(-3);
+  assert.equal(negative.log.filter(([e]) => e === 'osc.start').length, 0);
+});

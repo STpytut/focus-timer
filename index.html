@@ -158,6 +158,13 @@
           <label for="sound">Play a chime when a phase ends</label>
         </div>
 
+        <div class="field">
+          <label for="sound-volume">Chime volume: <output id="sound-volume-value" for="sound-volume">100%</output></label>
+          <input id="sound-volume" name="soundVolume" type="range"
+            min="0" max="100" step="1" required aria-describedby="sound-volume-error" />
+          <p id="sound-volume-error" class="field-error" hidden></p>
+        </div>
+
         <div class="notify">
           <p id="notify-status" class="field-hint" tabindex="-1" aria-live="polite"></p>
           <button type="button" id="notify-request" class="button">Allow notifications</button>

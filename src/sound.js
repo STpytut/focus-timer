@@ -7,7 +7,8 @@ const NOTES = [
   { frequency: 880, offset: 0 }, // A5
   { frequency: 1318.51, offset: 0.18 }, // E6
 ];
-const PEAK_GAIN = 0.2;
+const PEAK_GAIN = 0.2; // at 100% volume
+const DEFAULT_VOLUME = 100;
 const ATTACK = 0.02;
 const DECAY = 0.9;
 const SILENT = 0.0001;
@@ -50,12 +51,18 @@ export function createChime({
     return resume(ctx);
   }
 
-  /** Plays the chime. Resolves to false when audio is unavailable. */
-  async function play() {
+  /**
+   * Plays the chime at a 0-100 volume (100 is the full level; invalid values
+   * play at full level). Resolves to false when audio is unavailable.
+   */
+  async function play(volume = DEFAULT_VOLUME) {
     const ctx = ensureContext();
     if (!ctx) return false;
     try {
       if (!(await resume(ctx))) return false;
+      const level = Number.isFinite(volume) ? Math.min(100, Math.max(0, volume)) : DEFAULT_VOLUME;
+      if (level === 0) return true;
+      const peak = Math.max(SILENT * 2, (PEAK_GAIN * level) / 100);
       const start = ctx.currentTime + 0.01;
       for (const { frequency, offset } of NOTES) {
         const t = start + offset;
@@ -64,7 +71,7 @@ export function createChime({
         oscillator.type = 'sine';
         oscillator.frequency.setValueAtTime(frequency, t);
         gain.gain.setValueAtTime(SILENT, t);
-        gain.gain.exponentialRampToValueAtTime(PEAK_GAIN, t + ATTACK);
+        gain.gain.exponentialRampToValueAtTime(peak, t + ATTACK);
         gain.gain.exponentialRampToValueAtTime(SILENT, t + DECAY);
         oscillator.connect(gain);
         gain.connect(ctx.destination);

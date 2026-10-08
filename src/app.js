@@ -29,7 +29,7 @@ const PHASE_KINDS = {
   [PHASES.LONG_BREAK]: KINDS.LONG_BREAK,
 };
 
-const NUMBER_FIELDS = ['workMinutes', 'shortBreakMinutes', 'longBreakMinutes', 'sessionsBeforeLongBreak'];
+const NUMBER_FIELDS = ['workMinutes', 'shortBreakMinutes', 'longBreakMinutes', 'sessionsBeforeLongBreak', 'soundVolume'];
 
 const PERMISSION_TEXT = {
   [PERMISSION.DEFAULT]: 'Get a notification when a phase ends while this tab is in the background.',
@@ -220,7 +220,7 @@ function onComplete(event) {
     ? `${PHASE_LABELS[event.nextPhase]} has started.`
     : `${PHASE_LABELS[event.nextPhase]} is ready to start.`;
   announce(`${finished} ${next}`);
-  if (settings.get().sound) chime.play();
+  if (settings.get().sound) chime.play(settings.get().soundVolume);
   notifier.notify({ hidden: document.visibilityState === 'hidden', title: finished, body: next });
 }
 
@@ -285,10 +285,18 @@ function showErrors(errors) {
   }
 }
 
+function showVolume() {
+  const input = field('soundVolume');
+  const text = `${input.value}%`;
+  input.setAttribute('aria-valuetext', text);
+  document.getElementById('sound-volume-value').textContent = text;
+}
+
 function fillForm(values) {
   for (const name of NUMBER_FIELDS) field(name).value = String(values[name]);
   field('autoStart').checked = values.autoStart;
   field('sound').checked = values.sound;
+  showVolume();
   showErrors({});
 }
 
@@ -324,6 +332,8 @@ el.defaultsConfirm.addEventListener('click', () => {
   defaultsConfirmation.close();
   announce(result.message);
 });
+
+field('soundVolume').addEventListener('input', showVolume);
 
 el.settingsCancel.addEventListener('click', () => el.settings.close());
 
