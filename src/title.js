@@ -1,9 +1,8 @@
-// Builds the browser tab title: the running countdown (if any) plus a
-// "(N)" prefix with today's completed sessions.
+// Builds the browser tab title: "(N) Focus Timer" with today's completed
+// sessions, or plain "Focus Timer" when there are none.
 
 const BASE_TITLE = 'Focus Timer';
 
-export function documentTitle({ running, time, label, sessionsToday }) {
-  const base = running ? `${time} · ${label}` : BASE_TITLE;
-  return sessionsToday > 0 ? `(${sessionsToday}) ${base}` : base;
+export function documentTitle({ sessionsToday }) {
+  return sessionsToday > 0 ? `(${sessionsToday}) ${BASE_TITLE}` : BASE_TITLE;
 }

@@ -113,13 +113,7 @@ function plural(count, word) {
 }
 
 function renderTitle() {
-  const state = timer.getState();
-  document.title = documentTitle({
-    running: state.status !== STATUSES.IDLE,
-    time: formatTime(state.remainingMs),
-    label: PHASE_LABELS[state.phase],
-    sessionsToday: history.todaySessions(),
-  });
+  document.title = documentTitle({ sessionsToday: history.todaySessions() });
 }
 
 function renderDaily() {
