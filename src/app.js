@@ -11,6 +11,7 @@ import { createNotifier, PERMISSION } from './notify.js';
 import { shortcutFor } from './keyboard.js';
 import { createHelpDialog } from './help.js';
 import { createExporter } from './export.js';
+import { documentTitle } from './title.js';
 
 const TICK_MS = 250;
 const MAX_DOTS = 12;
@@ -111,7 +112,18 @@ function plural(count, word) {
   return `${count} ${count === 1 ? word : `${word}s`}`;
 }
 
+function renderTitle() {
+  const state = timer.getState();
+  document.title = documentTitle({
+    running: state.status !== STATUSES.IDLE,
+    time: formatTime(state.remainingMs),
+    label: PHASE_LABELS[state.phase],
+    sessionsToday: history.todaySessions(),
+  });
+}
+
 function renderDaily() {
+  renderTitle();
   const count = history.todaySessions();
   if (count === lastDailyCount) return;
   lastDailyCount = count;
@@ -148,7 +160,6 @@ function render() {
   if (el.time.textContent !== time) el.time.textContent = time;
   el.toggle.textContent = toggleLabel(state.status);
   el.skip.textContent = state.phase === PHASES.WORK ? 'Skip to break' : 'Skip to focus';
-  document.title = state.status === STATUSES.IDLE ? 'Focus Timer' : `${time} · ${label}`;
   renderDaily();
 }
 
