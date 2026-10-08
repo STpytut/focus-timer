@@ -328,6 +328,11 @@ export function createHistory({ storage = null, today = () => localDateKey(), no
     return dayOf(read(), today()).sessions;
   }
 
+  /** Current focus streak in days; see streak. */
+  function currentStreak() {
+    return streak(read(), today());
+  }
+
   /** Copy of all retained days keyed by date. */
   function snapshot() {
     const current = read();
@@ -384,5 +389,5 @@ export function createHistory({ storage = null, today = () => localDateKey(), no
 
   init();
 
-  return { recordCompletion, sessionRecords, sessionsCSV, recordSession, resetToday, todaySessions, snapshot, stats, csv };
+  return { recordCompletion, sessionRecords, sessionsCSV, recordSession, resetToday, todaySessions, streak: currentStreak, snapshot, stats, csv };
 }
