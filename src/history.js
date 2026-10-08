@@ -8,7 +8,8 @@
 //
 // Individual completed sessions (focus and breaks) are stored next to the
 // daily totals, each with its local date, ISO completion time, kind and
-// length in minutes, and follow the same retention and Reset today rules.
+// length in minutes, and follow the same retention and Reset today rules. Clear history
+// removes every day and every session record.
 // Daily totals stay focus-only. Sessions completed before records existed
 // are only known as aggregates, so no individual rows are invented for them.
 //
@@ -372,6 +373,21 @@ export function createHistory({ storage = null, today = () => localDateKey(), no
     return { date: key, cleared: true };
   }
 
+  /**
+   * Deletes every recorded day and individual session (all kinds, all
+   * dates). Nothing outside the history is touched. If storage fails the
+   * emptied history lives in memory, like any other write.
+   * @returns {{cleared: boolean, days: number, sessions: number}} what was
+   *   removed; `cleared` is false when the history was already empty
+   */
+  function clearAll() {
+    const current = read();
+    const removed = { days: Object.keys(current).length, sessions: sessions.length };
+    if (removed.days === 0 && removed.sessions === 0) return { cleared: false, ...removed };
+    write({}, []);
+    return { cleared: true, ...removed };
+  }
+
   function csv() {
     return toCSV(read());
   }
@@ -389,5 +405,5 @@ export function createHistory({ storage = null, today = () => localDateKey(), no
 
   init();
 
-  return { recordCompletion, sessionRecords, sessionsCSV, recordSession, resetToday, todaySessions, streak: currentStreak, snapshot, stats, csv };
+  return { recordCompletion, sessionRecords, sessionsCSV, recordSession, resetToday, clearAll, todaySessions, streak: currentStreak, snapshot, stats, csv };
 }

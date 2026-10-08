@@ -74,6 +74,10 @@ const el = {
   resetDialog: document.getElementById('reset-today'),
   resetCancel: document.getElementById('reset-today-cancel'),
   resetConfirm: document.getElementById('reset-today-confirm'),
+  clearOpen: document.getElementById('clear-history-open'),
+  clearDialog: document.getElementById('clear-history'),
+  clearCancel: document.getElementById('clear-history-cancel'),
+  clearConfirm: document.getElementById('clear-history-confirm'),
 };
 
 const storage = getSafeStorage();
@@ -89,7 +93,7 @@ const help = createHelpDialog({
   opener: el.helpOpen,
   closeButton: el.helpClose,
   document,
-  canOpen: () => !el.settings.open && !el.resetDialog.open,
+  canOpen: () => !el.settings.open && !el.resetDialog.open && !el.clearDialog.open,
 });
 // Same dialog behaviour as help: Cancel is focused first, and focus returns
 // to the Reset today button however the dialog closes.
@@ -98,7 +102,15 @@ const resetConfirmation = createHelpDialog({
   opener: el.resetOpen,
   closeButton: el.resetCancel,
   document,
-  canOpen: () => !el.settings.open && !help.isOpen(),
+  canOpen: () => !el.settings.open && !help.isOpen() && !clearConfirmation.isOpen(),
+});
+// Clear history confirmation: same behaviour, opened from its own button.
+const clearConfirmation = createHelpDialog({
+  dialog: el.clearDialog,
+  opener: el.clearOpen,
+  closeButton: el.clearCancel,
+  document,
+  canOpen: () => !el.settings.open && !help.isOpen() && !resetConfirmation.isOpen(),
 });
 
 let loopId = null;
@@ -225,7 +237,7 @@ const ACTIONS = {
 
 document.addEventListener('keydown', (event) => {
   const action = shortcutFor(event, {
-    modalOpen: el.settings.open || resetConfirmation.isOpen(),
+    modalOpen: el.settings.open || resetConfirmation.isOpen() || clearConfirmation.isOpen(),
     helpOpen: help.isOpen(),
     statsOpen: statsShown(),
   });
@@ -274,7 +286,7 @@ function renderPermission() {
 }
 
 function openSettings() {
-  if (el.settings.open || help.isOpen() || resetConfirmation.isOpen()) return;
+  if (el.settings.open || help.isOpen() || resetConfirmation.isOpen() || clearConfirmation.isOpen()) return;
   fillForm(settings.get()); // always start from the saved values
   renderPermission();
   el.settings.showModal();
@@ -422,6 +434,14 @@ el.resetConfirm.addEventListener('click', () => {
   renderDaily();
   renderStats();
   announce(cleared ? 'Today’s sessions and focus minutes were reset.' : 'Nothing to reset for today.');
+});
+
+el.clearConfirm.addEventListener('click', () => {
+  const { cleared } = history.clearAll();
+  clearConfirmation.close();
+  renderDaily();
+  renderStats();
+  announce(cleared ? 'All session history was cleared.' : 'There was no history to clear.');
 });
 
 // Catch up immediately when returning to a throttled background tab.
