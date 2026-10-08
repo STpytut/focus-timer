@@ -180,6 +180,15 @@ Open Settings with the gear button in the top-right corner.
   individual fields fall back on their own). If storage is unavailable or a
   save fails, the new settings still apply for the current page.
 
+- **Reset to defaults** (in Settings) opens a confirmation. Settings close
+  first, so two dialogs never stack, and unsaved edits are discarded. Only
+  **Reset to defaults** in the confirmation changes anything; **Cancel** or
+  `Escape` leaves the saved settings as they were, and focus returns to the
+  gear button. Confirming saves the defaults under `focus-timer:settings` and
+  applies them like **Save** does (see below), and announces whether they were
+  stored or only applied for this visit. Today's count and the history are not
+  touched.
+
 ### Changing settings while the timer runs
 
 - A phase that has already been started — running or paused — keeps the
@@ -246,7 +255,7 @@ open.
 (so closing help over Stats stays on Stats), otherwise it closes Settings like
 Cancel, otherwise it leaves Stats.
 
-Both dialogs are native modal `<dialog>` elements sharing one look, and only
+The dialogs (Settings, shortcuts and the confirmations) are native modal `<dialog>` elements sharing one look, and only
 one is open at a time: the rest of the page is inert so `Tab` cannot reach
 it, and the timer keeps running underneath.
 

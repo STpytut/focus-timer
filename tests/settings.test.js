@@ -5,6 +5,7 @@ import {
   DEFAULT_SETTINGS,
   parseSettingsForm,
   parseWholeNumber,
+  resetSettingsToDefaults,
   SETTINGS_KEY,
   toTimerConfig,
   validateSettings,
@@ -216,4 +217,43 @@ test('toTimerConfig converts minutes and applies to a timer', () => {
   assert.equal(s.durationMs, 50 * MIN);
   assert.equal(s.sessionsBeforeLongBreak, 2);
   assert.equal(s.autoStart, true);
+});
+
+const custom = () => ({
+  workMinutes: 50, shortBreakMinutes: 10, longBreakMinutes: 30,
+  sessionsBeforeLongBreak: 6, autoStart: true, sound: true,
+});
+
+test('reset to defaults persists defaults, configures the timer and leaves other keys alone', () => {
+  const storage = memoryStorage({ [DAILY_KEY]: '{"keep":1}', 'focus-timer:history': 'H' });
+  const store = createSettingsStore({ storage });
+  store.save(custom());
+  const timer = createTimer(toTimerConfig(store.get()));
+  assert.equal(timer.getState().remainingMs, 50 * MIN);
+  let unlocked = 0;
+  const result = resetSettingsToDefaults({ settings: store, timer, unlock: () => { unlocked += 1; } });
+  assert.equal(result.ok, true);
+  assert.equal(result.persisted, true);
+  assert.match(result.message, /reset to defaults\.$/);
+  assert.deepEqual(store.get(), DEFAULT_SETTINGS);
+  assert.deepEqual(JSON.parse(storage.data.get(SETTINGS_KEY)), DEFAULT_SETTINGS);
+  assert.deepEqual(createSettingsStore({ storage }).get(), DEFAULT_SETTINGS);
+  assert.equal(timer.getState().remainingMs, 25 * MIN);
+  assert.equal(unlocked, 0); // defaults have sound off
+  assert.equal(storage.data.get(DAILY_KEY), '{"keep":1}');
+  assert.equal(storage.data.get('focus-timer:history'), 'H');
+});
+
+test('reset to defaults reports when storage fails and still applies the defaults', () => {
+  const storage = memoryStorage();
+  storage.setItem = () => { throw new Error('full'); };
+  const store = createSettingsStore({ storage });
+  store.save(custom());
+  const timer = createTimer(toTimerConfig(store.get()));
+  const result = resetSettingsToDefaults({ settings: store, timer });
+  assert.equal(result.ok, true);
+  assert.equal(result.persisted, false);
+  assert.match(result.message, /for this visit; they could not be stored/);
+  assert.deepEqual(store.get(), DEFAULT_SETTINGS);
+  assert.equal(timer.getState().remainingMs, 25 * MIN);
 });

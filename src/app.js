@@ -5,7 +5,7 @@
 import { createTimer, cycleText, formatTime, PHASES, STATUSES } from './timer.js';
 import { getSafeStorage, localDateKey } from './daily.js';
 import { createHistory, KINDS, parseDateKey } from './history.js';
-import { createSettingsStore, parseSettingsForm, toTimerConfig } from './settings.js';
+import { createSettingsStore, parseSettingsForm, resetSettingsToDefaults, toTimerConfig } from './settings.js';
 import { createChime } from './sound.js';
 import { createNotifier, PERMISSION } from './notify.js';
 import { shortcutFor } from './keyboard.js';
@@ -52,6 +52,10 @@ const el = {
   settingsOpen: document.getElementById('settings-open'),
   settings: document.getElementById('settings'),
   settingsForm: document.getElementById('settings-form'),
+  settingsReset: document.getElementById('settings-reset-open'),
+  defaultsDialog: document.getElementById('reset-settings'),
+  defaultsCancel: document.getElementById('reset-settings-cancel'),
+  defaultsConfirm: document.getElementById('reset-settings-confirm'),
   settingsCancel: document.getElementById('settings-cancel'),
   helpOpen: document.getElementById('help-open'),
   help: document.getElementById('help'),
@@ -93,7 +97,7 @@ const help = createHelpDialog({
   opener: el.helpOpen,
   closeButton: el.helpClose,
   document,
-  canOpen: () => !el.settings.open && !el.resetDialog.open && !el.clearDialog.open,
+  canOpen: () => !el.settings.open && !el.resetDialog.open && !el.clearDialog.open && !el.defaultsDialog.open,
 });
 // Same dialog behaviour as help: Cancel is focused first, and focus returns
 // to the Reset today button however the dialog closes.
@@ -102,7 +106,7 @@ const resetConfirmation = createHelpDialog({
   opener: el.resetOpen,
   closeButton: el.resetCancel,
   document,
-  canOpen: () => !el.settings.open && !help.isOpen() && !clearConfirmation.isOpen(),
+  canOpen: () => !el.settings.open && !help.isOpen() && !clearConfirmation.isOpen() && !el.defaultsDialog.open,
 });
 // Clear history confirmation: same behaviour, opened from its own button.
 const clearConfirmation = createHelpDialog({
@@ -110,7 +114,16 @@ const clearConfirmation = createHelpDialog({
   opener: el.clearOpen,
   closeButton: el.clearCancel,
   document,
-  canOpen: () => !el.settings.open && !help.isOpen() && !resetConfirmation.isOpen(),
+  canOpen: () => !el.settings.open && !help.isOpen() && !resetConfirmation.isOpen() && !el.defaultsDialog.open,
+});
+// Reset settings confirmation: opened from Settings, which closes first so
+// two modals never stack. Focus returns to the gear however it closes.
+const defaultsConfirmation = createHelpDialog({
+  dialog: el.defaultsDialog,
+  opener: { addEventListener() {}, focus: () => el.settingsOpen.focus() },
+  closeButton: el.defaultsCancel,
+  document,
+  canOpen: () => !el.settings.open && !help.isOpen() && !resetConfirmation.isOpen() && !clearConfirmation.isOpen(),
 });
 
 let loopId = null;
@@ -237,7 +250,7 @@ const ACTIONS = {
 
 document.addEventListener('keydown', (event) => {
   const action = shortcutFor(event, {
-    modalOpen: el.settings.open || resetConfirmation.isOpen() || clearConfirmation.isOpen(),
+    modalOpen: el.settings.open || resetConfirmation.isOpen() || clearConfirmation.isOpen() || defaultsConfirmation.isOpen(),
     helpOpen: help.isOpen(),
     statsOpen: statsShown(),
   });
@@ -286,7 +299,7 @@ function renderPermission() {
 }
 
 function openSettings() {
-  if (el.settings.open || help.isOpen() || resetConfirmation.isOpen() || clearConfirmation.isOpen()) return;
+  if (el.settings.open || help.isOpen() || resetConfirmation.isOpen() || clearConfirmation.isOpen() || defaultsConfirmation.isOpen()) return;
   fillForm(settings.get()); // always start from the saved values
   renderPermission();
   el.settings.showModal();
@@ -296,7 +309,21 @@ function openSettings() {
 el.settingsOpen.addEventListener('click', openSettings);
 
 // Covers Save, Cancel and Escape: focus goes back to the gear.
-el.settings.addEventListener('close', () => el.settingsOpen.focus());
+el.settings.addEventListener('close', () => {
+  if (!defaultsConfirmation.isOpen()) el.settingsOpen.focus();
+});
+
+el.settingsReset.addEventListener('click', () => {
+  el.settings.close();
+  el.settingsOpen.focus(); // where focus returns when the confirmation closes
+  defaultsConfirmation.open();
+});
+
+el.defaultsConfirm.addEventListener('click', () => {
+  const result = resetSettingsToDefaults({ settings, timer, unlock: () => chime.unlock() }); // click is a user gesture
+  defaultsConfirmation.close();
+  announce(result.message);
+});
 
 el.settingsCancel.addEventListener('click', () => el.settings.close());
 
