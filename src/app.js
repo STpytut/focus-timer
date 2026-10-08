@@ -12,6 +12,7 @@ import { shortcutFor } from './keyboard.js';
 import { createHelpDialog } from './help.js';
 import { createExporter } from './export.js';
 import { documentTitle } from './title.js';
+import { streakText } from './streak.js';
 
 const TICK_MS = 250;
 const MAX_DOTS = 12;
@@ -46,6 +47,7 @@ const el = {
   skip: document.getElementById('skip'),
   dots: document.getElementById('dots'),
   todayCount: document.getElementById('today-count'),
+  todayStreak: document.getElementById('today-streak'),
   announcer: document.getElementById('announcer'),
   settingsOpen: document.getElementById('settings-open'),
   settings: document.getElementById('settings'),
@@ -116,8 +118,15 @@ function renderTitle() {
   document.title = documentTitle({ sessionsToday: history.todaySessions() });
 }
 
+function renderStreak() {
+  const text = streakText(history.streak());
+  el.todayStreak.textContent = text;
+  el.todayStreak.hidden = text === '';
+}
+
 function renderDaily() {
   renderTitle();
+  renderStreak();
   const count = history.todaySessions();
   if (count === lastDailyCount) return;
   lastDailyCount = count;

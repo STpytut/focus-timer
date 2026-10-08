@@ -233,9 +233,25 @@ body[data-status="paused"] .time {
   color: var(--muted);
 }
 
-.today-count {
+.today-summary {
   margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+}
+
+.today-count {
   color: var(--muted);
+}
+
+.today-streak {
+  font-weight: 600;
+}
+
+.today-streak[hidden] {
+  display: none;
 }
 
 .hint {
