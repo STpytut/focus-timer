@@ -32,3 +32,12 @@ test('title drops the count again after a reset', () => {
   assert.equal(documentTitle({ sessionsToday: 2 }), '(2) Focus Timer');
   assert.equal(documentTitle({ sessionsToday: 0 }), 'Focus Timer');
 });
+
+test('title returns to plain "Focus Timer" once the history is cleared', async () => {
+  const { createHistory } = await import('../src/history.js');
+  const history = createHistory({ storage: null, today: () => '2026-10-01' });
+  history.recordSession(25 * 60 * 1000);
+  assert.equal(documentTitle({ sessionsToday: history.todaySessions() }), '(1) Focus Timer');
+  history.clearAll();
+  assert.equal(documentTitle({ sessionsToday: history.todaySessions() }), 'Focus Timer');
+});

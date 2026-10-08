@@ -88,6 +88,19 @@ so a streak that only consisted of today becomes 0. The timer keeps running
 and is not affected, and later sessions are recorded as usual. Timer
 shortcuts and help do not fire while the confirmation is open.
 
+### Clear history
+
+**Clear history** (next to Reset today at the bottom of Stats) deletes every
+recorded session on every date: all daily totals and all individual focus and
+break records. It uses the same confirmation dialog behaviour as Reset today:
+focus starts on **Cancel**; **Cancel** or `Escape` closes only the dialog,
+changes nothing and returns focus to the Clear history button. Confirming
+immediately refreshes the dots, Stats totals, chart, empty state, streak
+(0), tab title (plain `Focus Timer`) and disables Export CSV. The timer and
+settings are not affected. If storage is unavailable or fails, the emptied
+history is kept in memory for the page, like every other history change.
+Programmatically this is `history.clearAll()`.
+
 ### Storage and retention
 
 History is saved in `localStorage` under `focus-timer:history` as one record

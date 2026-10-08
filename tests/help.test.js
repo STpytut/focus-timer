@@ -199,3 +199,34 @@ test('Escape in the reset confirmation does not leave Stats; timer shortcuts and
   assert.equal(state.statsOpen, true);
   assert.equal(press('Escape'), 'closeStats');
 });
+
+test('clear history confirmation: Cancel, Escape and exclusion with the reset confirmation', () => {
+  const { doc, dialog, opener, cancel, confirmation, help, state, press } = setupReset();
+  const clearDialog = fakeDialog(doc);
+  const clearOpener = fakeElement(doc, 'BUTTON');
+  const clearCancel = fakeElement(doc, 'BUTTON');
+  const clear = createHelpDialog({
+    dialog: clearDialog, opener: clearOpener, closeButton: clearCancel, document: doc,
+    canOpen: () => !confirmation.isOpen() && !help.isOpen(),
+  });
+  clearOpener.focus();
+  clearOpener.dispatch('click');
+  assert.equal(clearDialog.open, true);
+  assert.equal(doc.activeElement, clearCancel);
+  assert.equal(confirmation.open(), true); // reset confirmation is independent here
+  confirmation.close();
+  clearCancel.dispatch('click');
+  assert.equal(clearDialog.open, false);
+  assert.equal(doc.activeElement, clearOpener);
+
+  clear.open();
+  clearDialog.close(); // Escape closes the native dialog
+  assert.equal(doc.activeElement, clearOpener);
+  assert.equal(state.statsOpen, true);
+
+  confirmation.open();
+  assert.equal(clear.open(), false);
+  assert.equal(clearDialog.open, false);
+  assert.equal(dialog.open, true);
+  assert.equal(opener !== clearOpener, true);
+});

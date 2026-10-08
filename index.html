@@ -105,6 +105,7 @@
         </div>
         <div class="stats-actions">
           <button type="button" id="reset-today-open" class="button quiet" aria-haspopup="dialog" aria-controls="reset-today">Reset today</button>
+          <button type="button" id="clear-history-open" class="button quiet" aria-haspopup="dialog" aria-controls="clear-history">Clear history</button>
         </div>
       </section>
 
@@ -178,6 +179,19 @@
         <div class="dialog-actions">
           <button type="button" id="reset-today-cancel" class="button">Cancel</button>
           <button type="button" id="reset-today-confirm" class="button primary">Reset today</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="clear-history" class="dialog dialog-narrow" aria-labelledby="clear-history-title" aria-describedby="clear-history-text">
+      <div class="dialog-body">
+        <h2 id="clear-history-title" class="dialog-title">Clear all history?</h2>
+        <p id="clear-history-text" class="field-hint">
+          Every recorded session on every day will be deleted, including breaks, and your streak and stats will reset to zero. Timer and settings are kept. This cannot be undone.
+        </p>
+        <div class="dialog-actions">
+          <button type="button" id="clear-history-cancel" class="button">Cancel</button>
+          <button type="button" id="clear-history-confirm" class="button primary">Clear history</button>
         </div>
       </div>
     </dialog>

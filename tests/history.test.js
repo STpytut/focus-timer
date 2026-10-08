@@ -869,3 +869,72 @@ test('exports reflect reset immediately and a reload', () => {
   const reloaded = sessionHistory(storage).history;
   assert.equal(reloaded.sessionRecords().length, 1);
 });
+
+test('clearAll deletes every day and every session kind, and persists', () => {
+  const storage = memoryStorage();
+  let day = '2026-09-28';
+  const history = createHistory({ storage, today: () => day });
+  history.recordSession(25 * MIN);
+  history.recordCompletion('short break', 5 * MIN);
+  day = '2026-09-29';
+  history.recordSession(25 * MIN);
+  day = '2026-10-01';
+  history.recordSession(25 * MIN);
+  history.recordCompletion('long break', 15 * MIN);
+  assert.equal(history.stats().exportableSessions, 5);
+
+  assert.deepEqual(history.clearAll(), { cleared: true, days: 3, sessions: 5 });
+  assert.deepEqual(history.snapshot(), {});
+  assert.deepEqual(history.sessionRecords(), []);
+  const stats = history.stats();
+  assert.equal(stats.todaySessions, 0);
+  assert.equal(stats.weekMinutes, 0);
+  assert.equal(stats.streak, 0);
+  assert.equal(stats.recordedDays, 0);
+  assert.equal(stats.exportableSessions, 0);
+
+  const reloaded = createHistory({ storage, today: () => day });
+  assert.deepEqual(reloaded.snapshot(), {});
+  assert.deepEqual(reloaded.sessionRecords(), []);
+  assert.equal(reloaded.streak(), 0);
+  assert.equal(reloaded.csv(), `${CSV_HEADER}\n`);
+  assert.equal(JSON.parse(storage.getItem(HISTORY_KEY)).sessions.length, 0);
+});
+
+test('clearAll on an empty history is a no-op and recording works afterwards', () => {
+  const history = createHistory({ storage: memoryStorage(), today: () => '2026-10-01' });
+  assert.deepEqual(history.clearAll(), { cleared: false, days: 0, sessions: 0 });
+  history.recordSession(25 * MIN);
+  history.clearAll();
+  history.recordSession(25 * MIN);
+  assert.equal(history.todaySessions(), 1);
+  assert.equal(history.streak(), 1);
+});
+
+test('clearAll also removes a carried-over legacy count for good', () => {
+  const storage = memoryStorage({ [LEGACY_KEY]: JSON.stringify({ date: '2026-10-01', count: 3 }) });
+  const history = createHistory({ storage, today: () => '2026-10-01' });
+  assert.equal(history.todaySessions(), 3);
+  history.clearAll();
+  assert.equal(createHistory({ storage, today: () => '2026-10-01' }).todaySessions(), 0);
+});
+
+test('clearAll falls back to memory when storage throws, and works without storage', () => {
+  const storage = memoryStorage();
+  const history = createHistory({ storage, today: () => '2026-10-01' });
+  history.recordSession(25 * MIN);
+  history.recordCompletion('short break', 5 * MIN);
+  storage.setItem = () => {
+    throw new Error('full');
+  };
+  assert.equal(history.clearAll().cleared, true);
+  assert.deepEqual(history.snapshot(), {});
+  assert.deepEqual(history.sessionRecords(), []);
+  assert.equal(history.stats().streak, 0);
+
+  const bare = createHistory({ storage: null, today: () => '2026-10-01' });
+  bare.recordSession(25 * MIN);
+  bare.clearAll();
+  assert.equal(bare.todaySessions(), 0);
+  assert.equal(bare.sessionRecords().length, 0);
+});
