@@ -158,12 +158,20 @@
           <label for="sound">Play a chime when a phase ends</label>
         </div>
 
+        <div class="field">
+          <label for="sound-volume">Chime volume: <output id="sound-volume-value" for="sound-volume">100%</output></label>
+          <input id="sound-volume" name="soundVolume" type="range"
+            min="0" max="100" step="1" required aria-describedby="sound-volume-error" />
+          <p id="sound-volume-error" class="field-error" hidden></p>
+        </div>
+
         <div class="notify">
           <p id="notify-status" class="field-hint" tabindex="-1" aria-live="polite"></p>
           <button type="button" id="notify-request" class="button">Allow notifications</button>
         </div>
 
         <div class="dialog-actions">
+          <button type="button" id="settings-reset-open" class="button quiet" aria-haspopup="dialog" aria-controls="reset-settings">Reset to defaults</button>
           <button type="button" id="settings-cancel" class="button">Cancel</button>
           <button type="submit" class="button primary">Save</button>
         </div>
@@ -179,6 +187,19 @@
         <div class="dialog-actions">
           <button type="button" id="reset-today-cancel" class="button">Cancel</button>
           <button type="button" id="reset-today-confirm" class="button primary">Reset today</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="reset-settings" class="dialog dialog-narrow" aria-labelledby="reset-settings-title" aria-describedby="reset-settings-text">
+      <div class="dialog-body">
+        <h2 id="reset-settings-title" class="dialog-title">Reset settings to defaults?</h2>
+        <p id="reset-settings-text" class="field-hint">
+          Lengths, long-break interval, auto-start and sound return to their defaults and are applied right away. Unsaved changes in Settings are discarded. Your sessions and history are not affected.
+        </p>
+        <div class="dialog-actions">
+          <button type="button" id="reset-settings-cancel" class="button">Cancel</button>
+          <button type="button" id="reset-settings-confirm" class="button primary">Reset to defaults</button>
         </div>
       </div>
     </dialog>

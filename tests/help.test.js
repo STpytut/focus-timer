@@ -230,3 +230,41 @@ test('clear history confirmation: Cancel, Escape and exclusion with the reset co
   assert.equal(dialog.open, true);
   assert.equal(opener !== clearOpener, true);
 });
+
+test('settings reset confirmation: Cancel and Escape change nothing, focus returns to the gear, no stacking', () => {
+  const doc = fakeDocument();
+  const gear = fakeElement(doc, 'BUTTON');
+  const settingsDialog = fakeDialog(doc);
+  const dialog = fakeDialog(doc);
+  const cancel = fakeElement(doc, 'BUTTON');
+  let resets = 0;
+  const confirmation = createHelpDialog({
+    dialog, opener: { addEventListener() {}, focus: () => gear.focus() }, closeButton: cancel,
+    document: doc, canOpen: () => !settingsDialog.open,
+  });
+  // Mirrors the page: the Reset to defaults button closes Settings, then opens the confirmation.
+  const openFromSettings = () => {
+    settingsDialog.close();
+    gear.focus();
+    confirmation.open();
+  };
+
+  settingsDialog.open = true;
+  assert.equal(confirmation.open(), false); // never stacks over Settings
+  openFromSettings();
+  assert.equal(settingsDialog.open, false);
+  assert.equal(dialog.open, true);
+  assert.equal(doc.activeElement, cancel);
+  assert.equal(shortcutFor({ key: 'r', target: doc.activeElement }, { modalOpen: confirmation.isOpen() }), null);
+  assert.equal(shortcutFor({ key: '?', target: doc.activeElement }, { modalOpen: confirmation.isOpen() }), null);
+
+  cancel.dispatch('click');
+  assert.equal(dialog.open, false);
+  assert.equal(doc.activeElement, gear);
+
+  settingsDialog.open = true;
+  openFromSettings();
+  dialog.close(); // Escape
+  assert.equal(doc.activeElement, gear);
+  assert.equal(resets, 0);
+});

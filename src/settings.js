@@ -14,11 +14,13 @@ export const DEFAULT_SETTINGS = Object.freeze({
   sessionsBeforeLongBreak: 4,
   autoStart: false,
   sound: false,
+  soundVolume: 100,
 });
 
 export const LIMITS = Object.freeze({
   minutes: Object.freeze({ min: 1, max: 90 }),
   sessions: Object.freeze({ min: 2, max: 8 }),
+  volume: Object.freeze({ min: 0, max: 100 }),
 });
 
 const INTEGER_FIELDS = {
@@ -26,6 +28,7 @@ const INTEGER_FIELDS = {
   shortBreakMinutes: LIMITS.minutes,
   longBreakMinutes: LIMITS.minutes,
   sessionsBeforeLongBreak: LIMITS.sessions,
+  soundVolume: LIMITS.volume,
 };
 const BOOLEAN_FIELDS = ['autoStart', 'sound'];
 
@@ -156,4 +159,24 @@ export function createSettingsStore({ storage = null } = {}) {
   }
 
   return { get, save };
+}
+
+/**
+ * Restores DEFAULT_SETTINGS through the same save + configure path as the
+ * Settings form. Only the settings key is touched. `unlock` is called when
+ * the defaults enable sound, so the chime is ready like after a normal Save.
+ * @returns {{ok: boolean, persisted: boolean, message: string}}
+ */
+export function resetSettingsToDefaults({ settings, timer, unlock = () => {} }) {
+  const saved = settings.save({ ...DEFAULT_SETTINGS });
+  if (!saved.ok) return { ok: false, persisted: false, message: 'Settings could not be reset.' };
+  if (saved.value.sound) unlock();
+  timer.configure(toTimerConfig(saved.value));
+  return {
+    ok: true,
+    persisted: saved.persisted,
+    message: saved.persisted
+      ? 'Settings reset to defaults.'
+      : 'Settings reset to defaults for this visit; they could not be stored.',
+  };
 }

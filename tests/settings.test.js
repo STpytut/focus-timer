@@ -5,6 +5,7 @@ import {
   DEFAULT_SETTINGS,
   parseSettingsForm,
   parseWholeNumber,
+  resetSettingsToDefaults,
   SETTINGS_KEY,
   toTimerConfig,
   validateSettings,
@@ -34,6 +35,7 @@ test('defaults are 25/5/15 minutes, 4 sessions, auto-start and sound off', () =>
     sessionsBeforeLongBreak: 4,
     autoStart: false,
     sound: false,
+    soundVolume: 100,
   });
   assert.equal(SETTINGS_KEY === DAILY_KEY, false);
 });
@@ -92,12 +94,13 @@ test('form text is parsed strictly as whole numbers', () => {
     shortBreakMinutes: '10',
     longBreakMinutes: '30',
     sessionsBeforeLongBreak: '3',
+    soundVolume: '40',
     autoStart: true,
     sound: false,
   });
   assert.deepEqual(ok, {
     ok: true,
-    value: { workMinutes: 50, shortBreakMinutes: 10, longBreakMinutes: 30, sessionsBeforeLongBreak: 3, autoStart: true, sound: false },
+    value: { workMinutes: 50, shortBreakMinutes: 10, longBreakMinutes: 30, sessionsBeforeLongBreak: 3, soundVolume: 40, autoStart: true, sound: false },
   });
   const bad = parseSettingsForm({ ...ok.value, workMinutes: '', shortBreakMinutes: '5', longBreakMinutes: '15', sessionsBeforeLongBreak: '4' });
   assert.equal(bad.ok, false);
@@ -216,4 +219,79 @@ test('toTimerConfig converts minutes and applies to a timer', () => {
   assert.equal(s.durationMs, 50 * MIN);
   assert.equal(s.sessionsBeforeLongBreak, 2);
   assert.equal(s.autoStart, true);
+});
+
+const custom = () => ({
+  workMinutes: 50, shortBreakMinutes: 10, longBreakMinutes: 30,
+  sessionsBeforeLongBreak: 6, autoStart: true, sound: true, soundVolume: 30,
+});
+
+test('reset to defaults persists defaults, configures the timer and leaves other keys alone', () => {
+  const storage = memoryStorage({ [DAILY_KEY]: '{"keep":1}', 'focus-timer:history': 'H' });
+  const store = createSettingsStore({ storage });
+  store.save(custom());
+  const timer = createTimer(toTimerConfig(store.get()));
+  assert.equal(timer.getState().remainingMs, 50 * MIN);
+  let unlocked = 0;
+  const result = resetSettingsToDefaults({ settings: store, timer, unlock: () => { unlocked += 1; } });
+  assert.equal(result.ok, true);
+  assert.equal(result.persisted, true);
+  assert.match(result.message, /reset to defaults\.$/);
+  assert.deepEqual(store.get(), DEFAULT_SETTINGS);
+  assert.deepEqual(JSON.parse(storage.data.get(SETTINGS_KEY)), DEFAULT_SETTINGS);
+  assert.deepEqual(createSettingsStore({ storage }).get(), DEFAULT_SETTINGS);
+  assert.equal(timer.getState().remainingMs, 25 * MIN);
+  assert.equal(unlocked, 0); // defaults have sound off
+  assert.equal(storage.data.get(DAILY_KEY), '{"keep":1}');
+  assert.equal(storage.data.get('focus-timer:history'), 'H');
+});
+
+test('reset to defaults reports when storage fails and still applies the defaults', () => {
+  const storage = memoryStorage();
+  storage.setItem = () => { throw new Error('full'); };
+  const store = createSettingsStore({ storage });
+  store.save(custom());
+  const timer = createTimer(toTimerConfig(store.get()));
+  const result = resetSettingsToDefaults({ settings: store, timer });
+  assert.equal(result.ok, true);
+  assert.equal(result.persisted, false);
+  assert.match(result.message, /for this visit; they could not be stored/);
+  assert.deepEqual(store.get(), DEFAULT_SETTINGS);
+  assert.equal(timer.getState().remainingMs, 25 * MIN);
+});
+
+test('volume accepts whole numbers from 0 to 100 only', () => {
+  for (const good of [0, 1, 55, 100]) assert.equal(validateSettings({ ...valid(), soundVolume: good }).ok, true, String(good));
+  for (const bad of [-1, 101, 50.5, NaN, Infinity, '50', null, undefined, true]) {
+    const result = validateSettings({ ...valid(), soundVolume: bad });
+    assert.equal(result.ok, false, String(bad));
+    assert.ok(result.errors.soundVolume);
+  }
+});
+
+test('volume form text is parsed strictly', () => {
+  const fields = { workMinutes: '25', shortBreakMinutes: '5', longBreakMinutes: '15', sessionsBeforeLongBreak: '4', autoStart: false, sound: true };
+  assert.equal(parseSettingsForm({ ...fields, soundVolume: '0' }).value.soundVolume, 0);
+  assert.equal(parseSettingsForm({ ...fields, soundVolume: '100' }).value.soundVolume, 100);
+  for (const bad of ['', '101', '-1', '5.5', 'loud']) {
+    assert.equal(parseSettingsForm({ ...fields, soundVolume: bad }).ok, false, bad);
+  }
+});
+
+test('legacy stored settings without volume use the default, invalid volume falls back', () => {
+  const legacy = JSON.stringify({ workMinutes: 40, shortBreakMinutes: 5, longBreakMinutes: 15, sessionsBeforeLongBreak: 4, autoStart: false, sound: true });
+  assert.equal(createSettingsStore({ storage: memoryStorage({ [SETTINGS_KEY]: legacy }) }).get().soundVolume, 100);
+  for (const bad of [150, -5, 2.5, '70', null]) {
+    const raw = JSON.stringify({ soundVolume: bad });
+    assert.equal(createSettingsStore({ storage: memoryStorage({ [SETTINGS_KEY]: raw }) }).get().soundVolume, 100, String(bad));
+  }
+});
+
+test('volume persists and reloads, including zero', () => {
+  for (const soundVolume of [0, 35, 100]) {
+    const storage = memoryStorage();
+    createSettingsStore({ storage }).save({ ...valid(), soundVolume });
+    assert.equal(JSON.parse(storage.data.get(SETTINGS_KEY)).soundVolume, soundVolume);
+    assert.equal(createSettingsStore({ storage }).get().soundVolume, soundVolume);
+  }
 });
