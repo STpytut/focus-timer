@@ -351,6 +351,14 @@ test('formatTime rounds up to whole seconds', () => {
   assert.equal(formatTime(-50), '00:00');
 });
 
+test('formatTime handles second and minute boundaries and totals over an hour', () => {
+  assert.equal(formatTime(0), '00:00');
+  assert.equal(formatTime(59 * 1000), '00:59');
+  assert.equal(formatTime(60 * 1000), '01:00');
+  assert.equal(formatTime(61 * 1000), '01:01');
+  assert.equal(formatTime(61 * MIN + 1000), '61:01');
+});
+
 // --- Custom configuration and live changes ---
 
 test('custom lengths and session threshold drive a full cycle', () => {
