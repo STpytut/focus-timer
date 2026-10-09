@@ -325,3 +325,5 @@ the action has no further effect.
   (help dialog wiring and focus restoration driven through the shortcut
   mapping, on a small fake DOM). `app.js` is browser-only and not covered by
   them.
+
+The timer supports keyboard shortcuts: Space starts or pauses, and R resets.
